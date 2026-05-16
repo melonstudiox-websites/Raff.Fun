@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Raff or Cap? — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#e01f1f;--accent2:#1a6aff;--text:#f0ede6;--muted:#555}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:1000;opacity:.35}
+  .back-btn{position:fixed;top:18px;left:18px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:var(--surface);transition:all .15s;z-index:10}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  .game-wrap{width:100%;max-width:560px;padding:80px 24px 60px;display:flex;flex-direction:column;align-items:center;gap:28px;position:relative;z-index:1}
+  .game-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,12vw,80px);letter-spacing:.04em;text-align:center;line-height:1}
+  .game-title .r{color:var(--accent)} .game-title .b{color:var(--accent2)}
+  .game-subtitle{color:var(--muted);font-size:14px;letter-spacing:.1em;text-transform:uppercase}
+  .timer-bar-wrap{width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+  .timer-bar-fill{height:100%;border-radius:3px;transition:width .1s linear,background .5s}
+  .score-row{display:flex;align-items:center;justify-content:space-between;width:100%}
+  .score-display{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .score-display span{color:var(--accent);font-weight:600}
+  .streak-display{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .streak-display span{color:#ff8800;font-weight:600}
+  .fact-card{width:100%;background:var(--surface);border:2px solid var(--border);border-radius:24px;padding:48px 32px;text-align:center;position:relative;overflow:hidden;transition:border-color .2s,background .2s;min-height:160px;display:flex;align-items:center;justify-content:center}
+  .fact-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .fact-card.flash-real{border-color:#1aff6a;background:rgba(26,255,106,.05)}
+  .fact-card.flash-cap{border-color:var(--accent);background:rgba(224,31,31,.05)}
+  .fact-text{font-size:clamp(18px,4vw,24px);font-weight:600;line-height:1.5;color:var(--text);animation:pop-in .3s cubic-bezier(.16,1,.3,1) both}
+  .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%}
+  .vote-btn{padding:22px 0;border-radius:16px;border:2px solid transparent;font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.08em;cursor:pointer;transition:all .12s;position:relative;overflow:hidden}
+  .btn-real{background:rgba(26,255,106,.1);border-color:rgba(26,255,106,.25);color:#1aff6a}
+  .btn-real:hover{background:rgba(26,255,106,.2);border-color:#1aff6a;transform:translateY(-3px);box-shadow:0 8px 24px rgba(26,255,106,.2)}
+  .btn-cap{background:rgba(26,106,255,.1);border-color:rgba(26,106,255,.25);color:var(--accent2)}
+  .btn-cap:hover{background:rgba(26,106,255,.2);border-color:var(--accent2);transform:translateY(-3px);box-shadow:0 8px 24px rgba(26,106,255,.2)}
+  .btn-row.disabled button{pointer-events:none;opacity:.6}
+  .feedback{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;text-align:center;display:none;flex-direction:column;gap:6px;animation:pop-in .25s cubic-bezier(.16,1,.3,1) both}
+  .feedback.visible{display:flex}
+  .feedback-verdict{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.06em}
+  .feedback-reason{font-size:14px;color:var(--muted);font-weight:300;line-height:1.4}
+  .final-screen{display:none;width:100%;flex-direction:column;align-items:center;gap:20px;text-align:center;animation:pop-in .5s cubic-bezier(.16,1,.3,1) both}
+  .final-screen.visible{display:flex}
+  .final-big{font-size:80px;animation:float 2.5s ease-in-out infinite}
+  .final-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,8vw,64px);letter-spacing:.04em}
+  .final-score{font-family:'Bebas Neue',sans-serif;font-size:clamp(60px,12vw,96px);color:var(--accent);line-height:1}
+  .final-label{font-size:13px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+  .final-streak{font-family:'Bebas Neue',sans-serif;font-size:28px;color:#ff8800}
+  .final-sub{font-size:16px;font-weight:300;color:var(--muted);max-width:340px;line-height:1.6}
+  .replay-btn{padding:16px 44px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.1em;cursor:pointer;transition:transform .1s;margin-top:8px}
+  .replay-btn:hover{transform:scale(1.05)}
+  @keyframes pop-in{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<div class="game-wrap">
+  <div class="game-title"><span class="r">Raff</span> or <span class="b">Cap</span>?</div>
+  <div class="game-subtitle">Speed round — real fact or total cap?</div>
+  <div class="score-row">
+    <div class="score-display">Score: <span id="score-val">0</span>/<span id="total-val">12</span></div>
+    <div class="streak-display">🔥 Streak: <span id="streak-val">0</span></div>
+  </div>
+  <div class="timer-bar-wrap"><div class="timer-bar-fill" id="timer-bar" style="width:100%;background:#e01f1f"></div></div>
+  <div class="fact-card" id="fact-card">
+    <div class="fact-text" id="fact-text">Loading...</div>
+  </div>
+  <div class="btn-row" id="btn-row">
+    <button class="vote-btn btn-real" onclick="answer(true)">✅ RAFF</button>
+    <button class="vote-btn btn-cap" onclick="answer(false)">🧢 CAP</button>
+  </div>
+  <div class="feedback" id="feedback">
+    <div class="feedback-verdict" id="fb-verdict"></div>
+    <div class="feedback-reason" id="fb-reason"></div>
+  </div>
+  <div class="final-screen" id="final-screen">
+    <div class="final-big" id="final-emoji">🎯</div>
+    <div class="final-title" id="final-title">Done!</div>
+    <div class="final-score" id="final-score">0/12</div>
+    <div class="final-label">correct</div>
+    <div class="final-streak">Best streak: <span id="best-streak">0</span> 🔥</div>
+    <div class="final-sub" id="final-sub"></div>
+    <button class="replay-btn" onclick="startGame()">Play Again</button>
+    <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+  </div>
+</div>
+<script>
+// ─── FACTS ──────────────────────────────────────────────────
+// isReal: true = this actually happened / is true about Raff
+//         false = it's cap / made up
+// reason: shown after answer
+// CUSTOMIZE: add real/fake Raff facts below!
+const ALL_FACTS = [
+  { text:"Raff has never once been early to anything.", isReal:true, reason:"Not once in recorded history." },
+  { text:"Raff replies to every text within 10 minutes.", isReal:false, reason:"Cap. The reply rate is more like... eventually." },
+  { text:"Raff claims he's 'not even tired' at 2am.", isReal:true, reason:"This is said with full confidence. Right before sleeping." },
+  { text:"Raff reads instructions before assembling anything.", isReal:false, reason:"Pure cap. Wing it or die trying." },
+  { text:"Raff has started at least three hobbies that lasted under a month.", isReal:true, reason:"The equipment is still around. Somewhere." },
+  { text:"Raff sets alarms he fully intends to wake up to.", isReal:false, reason:"The alarm is a formality. A suggestion. Not a command." },
+  { text:"Raff once watched 6 episodes claiming it was 'just one more'.", isReal:true, reason:"'Just one more' is Raff's most technically false statement." },
+  { text:"Raff eats the exact same lunch every day without question.", isReal:false, reason:"Raff has unpredictable and chaotic food opinions." },
+  { text:"Raff has texted the wrong person at least once and panicked.", isReal:true, reason:"The panic was significant." },
+  { text:"Raff is always the first one to apologize after an argument.", isReal:false, reason:"He'll wait it out. Stubborn is an understatement." },
+  { text:"Raff has rewatched the same show at least once because new ones felt like too much.", isReal:true, reason:"Comfort rewatch is a legitimate strategy." },
+  { text:"Raff meal-preps every Sunday for the week ahead.", isReal:false, reason:"This is the most fictional thing on this list." },
+  { text:"Raff has blamed traffic for being late when he hadn't left yet.", isReal:true, reason:"A classic. The traffic was theoretical." },
+  { text:"Raff goes to bed before midnight every night.", isReal:false, reason:"2am is the floor. Not the ceiling." },
+  { text:"Raff once 'cleaned his room' by moving things into a pile.", isReal:true, reason:"The pile has structure. He can find things in it. It counts." },
+  { text:"Raff finished a project a whole week before the deadline.", isReal:false, reason:"The deadline IS the start time. This is sacred Raff doctrine." },
+];
+
+let facts=[], current=0, score=0, streak=0, bestStreak=0, timer=null, timeLeft=0, answered=false;
+const TIME_PER_Q = 8000;
+
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
+
+function startGame(){
+  facts=shuffle(ALL_FACTS).slice(0,12);
+  current=0;score=0;streak=0;bestStreak=0;
+  document.getElementById('total-val').textContent=facts.length;
+  document.getElementById('final-screen').classList.remove('visible');
+  document.getElementById('btn-row').style.display='grid';
+  document.getElementById('feedback').classList.remove('visible');
+  document.getElementById('fact-card').className='fact-card';
+  renderFact();
+}
+
+function renderFact(){
+  answered=false;
+  clearTimeout(timer);
+  const f=facts[current];
+  document.getElementById('score-val').textContent=score;
+  document.getElementById('streak-val').textContent=streak;
+  document.getElementById('fact-text').textContent=f.text;
+  document.getElementById('fact-card').className='fact-card';
+  document.getElementById('btn-row').classList.remove('disabled');
+  document.getElementById('feedback').classList.remove('visible');
+  startTimer();
+}
+
+function startTimer(){
+  timeLeft=TIME_PER_Q;
+  const bar=document.getElementById('timer-bar');
+  bar.style.transition='none';
+  bar.style.width='100%';
+  bar.style.background='#e01f1f';
+  setTimeout(()=>{
+    bar.style.transition=`width ${TIME_PER_Q}ms linear`;
+    bar.style.width='0%';
+  },30);
+  timer=setTimeout(()=>answer(null),TIME_PER_Q+100);
+}
+
+function answer(choice){
+  if(answered)return;
+  answered=true;
+  clearTimeout(timer);
+  document.getElementById('timer-bar').style.transition='none';
+  document.getElementById('btn-row').classList.add('disabled');
+  const f=facts[current];
+  const correct=choice===f.isReal;
+  if(choice===null){
+    streak=0;
+    showFeedback('⏰ Time\'s Up!','var(--muted)',f.reason);
+    document.getElementById('fact-card').classList.add(f.isReal?'flash-real':'flash-cap');
+  } else if(correct){
+    score++;streak++;if(streak>bestStreak)bestStreak=streak;
+    showFeedback('✅ Correct!','#1aff6a',f.reason);
+    document.getElementById('fact-card').classList.add('flash-real');
+  } else {
+    streak=0;
+    showFeedback('❌ Wrong!','var(--accent)',f.reason);
+    document.getElementById('fact-card').classList.add('flash-cap');
+  }
+  document.getElementById('score-val').textContent=score;
+  document.getElementById('streak-val').textContent=streak;
+  setTimeout(()=>{current++;if(current>=facts.length)showFinal();else renderFact();},1600);
+}
+
+function showFeedback(verdict, color, reason){
+  const v=document.getElementById('fb-verdict');
+  v.textContent=verdict;v.style.color=color;
+  document.getElementById('fb-reason').textContent=reason;
+  document.getElementById('feedback').classList.add('visible');
+}
+
+function showFinal(){
+  document.getElementById('final-screen').classList.add('visible');
+  const pct=score/facts.length;
+  document.getElementById('final-score').textContent=`${score}/${facts.length}`;
+  document.getElementById('best-streak').textContent=bestStreak;
+  let e,t,s;
+  if(pct===1){e='🏆';t='No Cap, You Know Raff';s='Perfect score. Absolutely zero cap detected.'}
+  else if(pct>=0.75){e='🎯';t='Sharp!';s='You spot the cap fast. Good instincts.'}
+  else if(pct>=0.5){e='😄';t='Decent Run';s='Some got you. Keep studying the subject.'}
+  else{e='💀';t='Full Cap Energy';s='You believed the fakes. Raff is disappointed.'}
+  document.getElementById('final-emoji').textContent=e;
+  document.getElementById('final-title').textContent=t;
+  document.getElementById('final-sub').textContent=s;
+}
+startGame();
+</script>
+</body>
+</html>

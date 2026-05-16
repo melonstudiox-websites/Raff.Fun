@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Raff or Raff? — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a; --surface: #111; --border: #1e1e1e;
+    --accent: #e01f1f; --accent2: #1a6aff; --text: #f0ede6; --muted: #555;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 1000; opacity: 0.35; }
+  .back-btn { position: fixed; top: 18px; left: 18px; display: flex; align-items: center; gap: 7px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 100px; color: var(--muted); text-decoration: none; font-size: 13px; background: var(--surface); transition: all 0.15s; z-index: 10; }
+  .back-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .game-wrap { width: 100%; max-width: 680px; padding: 80px 24px 60px; display: flex; flex-direction: column; align-items: center; gap: 28px; position: relative; z-index: 1; }
+  .game-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(48px, 10vw, 76px); letter-spacing: 0.04em; text-align: center; line-height: 1; }
+  .game-title .r { color: var(--accent); }
+  .game-subtitle { color: var(--muted); font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .progress-bar-wrap { width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s cubic-bezier(.16,1,.3,1); }
+  .score-display { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .score-display span { color: var(--accent); font-weight: 600; }
+  .round-label { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); text-align: center; }
+  .cards-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; }
+  .quote-card { background: var(--surface); border: 2px solid var(--border); border-radius: 20px; padding: 32px 24px; cursor: pointer; display: flex; flex-direction: column; gap: 16px; align-items: center; text-align: center; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; position: relative; overflow: hidden; }
+  .quote-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.2s; }
+  .quote-card:hover { transform: translateY(-4px); border-color: #333; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+  .quote-card:hover::before { opacity: 1; }
+  .quote-card.correct { border-color: #1aff6a; background: rgba(26,255,106,0.06); }
+  .quote-card.wrong { border-color: var(--accent); background: rgba(224,31,31,0.08); }
+  .quote-card.disabled { pointer-events: none; }
+  .quote-big { font-size: 32px; }
+  .quote-text { font-size: 16px; font-weight: 300; line-height: 1.6; color: var(--text); font-style: italic; }
+  .quote-attr { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+  .result-banner { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px 28px; text-align: center; display: none; flex-direction: column; gap: 10px; align-items: center; animation: pop-in 0.3s cubic-bezier(.16,1,.3,1) both; }
+  .result-banner.visible { display: flex; }
+  .result-banner .verdict { font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 0.06em; }
+  .result-banner .reason { font-size: 15px; color: var(--muted); font-weight: 300; line-height: 1.5; max-width: 420px; }
+  .next-btn { padding: 12px 32px; background: var(--accent); color: #fff; border: none; border-radius: 100px; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 0.1em; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; margin-top: 4px; }
+  .next-btn:hover { transform: scale(1.05); box-shadow: 0 6px 24px rgba(224,31,31,0.35); }
+  .final-screen { display: none; width: 100%; flex-direction: column; align-items: center; gap: 20px; text-align: center; animation: pop-in 0.5s cubic-bezier(.16,1,.3,1) both; }
+  .final-screen.visible { display: flex; }
+  .final-big { font-size: 80px; animation: float 2.5s ease-in-out infinite; }
+  .final-title { font-family: 'Bebas Neue', sans-serif; font-size: clamp(40px,8vw,64px); letter-spacing: 0.04em; }
+  .final-score { font-family: 'Bebas Neue', sans-serif; font-size: clamp(60px,12vw,96px); color: var(--accent); line-height: 1; }
+  .final-label { font-size: 13px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+  .final-sub { font-size: 16px; font-weight: 300; color: var(--muted); max-width: 340px; line-height: 1.6; }
+  .replay-btn { padding: 16px 44px; background: var(--accent); color: #fff; border: none; border-radius: 100px; font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.1em; cursor: pointer; transition: transform 0.1s; margin-top: 8px; }
+  .replay-btn:hover { transform: scale(1.05); }
+  @keyframes pop-in { from { opacity: 0; transform: scale(0.94) translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  @media (max-width: 520px) { .cards-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<div class="game-wrap">
+  <div class="game-title"><span class="r">Raff</span> or <span class="r">Raff</span>?</div>
+  <div class="game-subtitle">Two quotes — only one is real. Pick it.</div>
+  <div style="width:100%;display:flex;flex-direction:column;gap:10px;align-items:center;">
+    <div class="score-display">Score: <span id="score-val">0</span> / <span id="total-val">0</span></div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div id="main-ui" style="width:100%;display:flex;flex-direction:column;gap:20px;align-items:center;">
+    <div class="round-label" id="round-label">Round 1 of 8</div>
+    <div class="cards-row" id="cards-row"></div>
+    <div class="result-banner" id="result-banner">
+      <div class="verdict" id="verdict-text"></div>
+      <div class="reason" id="reason-text"></div>
+      <button class="next-btn" onclick="nextRound()">Next →</button>
+    </div>
+  </div>
+  <div class="final-screen" id="final-screen">
+    <div class="final-big" id="final-emoji">🎯</div>
+    <div class="final-title" id="final-title">Not bad!</div>
+    <div class="final-score" id="final-score">0/8</div>
+    <div class="final-label">correct picks</div>
+    <div class="final-sub" id="final-sub"></div>
+    <button class="replay-btn" onclick="startGame()">Play Again</button>
+    <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px;">← More games</a>
+  </div>
+</div>
+<script>
+// ─── ROUNDS ───────────────────────────────────────────────────
+// Each round has a real Raff quote and a fake one.
+// realIndex: 0 = left card is real, 1 = right card is real (shuffled anyway)
+// CUSTOMIZE: add/edit rounds below!
+const ALL_ROUNDS = [
+  {
+    real: { text: "I wasn't late, I was on Raff time.", attr: "— Raff, probably" },
+    fake: { text: "Punctuality is the politeness of kings.", attr: "— Raff, never" },
+    reason: "Raff has never once acknowledged a clock in his life."
+  },
+  {
+    real: { text: "I said I'd do it and I will — just not right now.", attr: "— Raff" },
+    fake: { text: "Let's get started immediately, no time to waste!", attr: "— Raff" },
+    reason: "Classic Raff procrastination philosophy, delivered with full confidence."
+  },
+  {
+    real: { text: "The pizza was fine but it could've had more cheese.", attr: "— Raff, food critic" },
+    fake: { text: "Actually I think this has too much cheese.", attr: "— Raff" },
+    reason: "There is never too much cheese in Raff's world."
+  },
+  {
+    real: { text: "I'm not tired. I'm just resting my eyes.", attr: "— Raff, five minutes before snoring" },
+    fake: { text: "I should really go to sleep, it's getting late.", attr: "— Raff" },
+    reason: "Raff denies exhaustion until he physically cannot."
+  },
+  {
+    real: { text: "Yeah I watched it — well, most of it.", attr: "— Raff on every movie" },
+    fake: { text: "I finished it and took notes on the themes.", attr: "— Raff" },
+    reason: "Raff watches the first 70% of everything."
+  },
+  {
+    real: { text: "It's not procrastinating if I'm thinking about it.", attr: "— Raff's life motto" },
+    fake: { text: "I like to plan everything out in advance.", attr: "— Raff" },
+    reason: "Thinking about it counts as doing it. Raff stands firm on this."
+  },
+  {
+    real: { text: "Trust me, it tastes better than it looks.", attr: "— Raff, about something concerning" },
+    fake: { text: "I don't experiment with food, I keep it simple.", attr: "— Raff" },
+    reason: "Raff is a chaotic food scientist."
+  },
+  {
+    real: { text: "I was going to reply but then I forgot and then it felt weird to reply late.", attr: "— Raff, ghost mode" },
+    fake: { text: "I always reply within the hour, I hate leaving people waiting.", attr: "— Raff" },
+    reason: "Raff's text inbox is a graveyard."
+  },
+  {
+    real: { text: "It's funnier if I don't explain it.", attr: "— Raff after a joke nobody got" },
+    fake: { text: "Let me break it down so everyone gets the joke.", attr: "— Raff" },
+    reason: "The bit lives or dies on its own. Raff refuses to explain."
+  },
+  {
+    real: { text: "This is the last episode, then I'm going to sleep.", attr: "— Raff, 3am, episode 6 of 8" },
+    fake: { text: "I'll just watch one episode tonight.", attr: "— Raff" },
+    reason: "This sentence has never been true in Raff's life."
+  },
+];
+
+let rounds = [], current = 0, score = 0;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function startGame() {
+  rounds = shuffle(ALL_ROUNDS).slice(0, 8);
+  current = 0; score = 0;
+  document.getElementById('final-screen').classList.remove('visible');
+  document.getElementById('main-ui').style.display = 'flex';
+  document.getElementById('result-banner').classList.remove('visible');
+  renderRound();
+}
+
+function renderRound() {
+  const r = rounds[current];
+  document.getElementById('round-label').textContent = `Round ${current+1} of ${rounds.length}`;
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('total-val').textContent = current;
+  document.getElementById('progress-fill').style.width = `${(current/rounds.length)*100}%`;
+  document.getElementById('result-banner').classList.remove('visible');
+
+  // Randomly assign real/fake to left/right
+  const realLeft = Math.random() > 0.5;
+  const left  = realLeft ? r.real : r.fake;
+  const right = realLeft ? r.fake : r.real;
+  const leftIsReal = realLeft;
+
+  const row = document.getElementById('cards-row');
+  row.innerHTML = `
+    <div class="quote-card" id="card-left" onclick="pick(${leftIsReal}, 'card-left', 'card-right')">
+      <div class="quote-big">💬</div>
+      <div class="quote-text">"${left.text}"</div>
+      <div class="quote-attr">${left.attr}</div>
+    </div>
+    <div class="quote-card" id="card-right" onclick="pick(${!leftIsReal}, 'card-right', 'card-left')">
+      <div class="quote-big">💬</div>
+      <div class="quote-text">"${right.text}"</div>
+      <div class="quote-attr">${right.attr}</div>
+    </div>
+  `;
+}
+
+function pick(isReal, pickedId, otherId) {
+  if (isReal) score++;
+  const picked = document.getElementById(pickedId);
+  const other  = document.getElementById(otherId);
+  picked.classList.add(isReal ? 'correct' : 'wrong');
+  picked.classList.add('disabled');
+  other.classList.add('disabled');
+  if (!isReal) other.classList.add('correct');
+
+  const r = rounds[current];
+  const verdict = document.getElementById('verdict-text');
+  verdict.textContent = isReal ? '✅ Correct!' : '❌ Wrong!';
+  verdict.style.color = isReal ? '#1aff6a' : 'var(--accent)';
+  document.getElementById('reason-text').textContent = r.reason;
+  document.getElementById('result-banner').classList.add('visible');
+}
+
+function nextRound() {
+  current++;
+  if (current >= rounds.length) showFinal();
+  else renderRound();
+}
+
+function showFinal() {
+  document.getElementById('main-ui').style.display = 'none';
+  document.getElementById('final-screen').classList.add('visible');
+  const pct = score / rounds.length;
+  document.getElementById('final-score').textContent = `${score}/${rounds.length}`;
+  let emoji, title, sub;
+  if (pct === 1)      { emoji='🏆'; title='Certified Raff Scholar'; sub='Perfect score. You could ghostwrite for him.'; }
+  else if (pct>=0.75) { emoji='🎯'; title='Sharp Eye!'; sub='You know Raff\'s voice really well.'; }
+  else if (pct>=0.5)  { emoji='😄'; title='Not Bad!'; sub='Decent Raff knowledge. Room to improve.'; }
+  else                { emoji='💀'; title='Did You Guess?'; sub='Raff would be offended but also unsurprised.'; }
+  document.getElementById('final-emoji').textContent = emoji;
+  document.getElementById('final-title').textContent = title;
+  document.getElementById('final-sub').textContent = sub;
+}
+
+startGame();
+</script>
+</body>
+</html>

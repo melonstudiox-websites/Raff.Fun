@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Raff Roulette — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#e01f1f;--accent2:#1a6aff;--text:#f0ede6;--muted:#555}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:1000;opacity:.35}
+  .back-btn{position:fixed;top:18px;left:18px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:var(--surface);transition:all .15s;z-index:10}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  .game-wrap{width:100%;max-width:560px;padding:80px 24px 60px;display:flex;flex-direction:column;align-items:center;gap:32px;position:relative;z-index:1}
+  .game-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,12vw,80px);letter-spacing:.04em;text-align:center;line-height:1}
+  .game-title .r{color:var(--accent)}
+  .game-subtitle{color:var(--muted);font-size:14px;letter-spacing:.1em;text-transform:uppercase}
+  .wheel-wrap{position:relative;width:280px;height:280px;display:flex;align-items:center;justify-content:center}
+  .wheel-svg{width:280px;height:280px;transition:transform 4s cubic-bezier(.17,.67,.12,1)}
+  .wheel-pointer{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:24px solid var(--text);filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))}
+  .spin-btn{padding:18px 52px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.12em;cursor:pointer;transition:transform .12s,box-shadow .12s;box-shadow:0 4px 20px rgba(224,31,31,.3)}
+  .spin-btn:hover{transform:scale(1.06);box-shadow:0 8px 32px rgba(224,31,31,.4)}
+  .spin-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .result-card{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:36px 28px;text-align:center;display:none;flex-direction:column;gap:14px;align-items:center;animation:pop-in .4s cubic-bezier(.16,1,.3,1) both;position:relative;overflow:hidden}
+  .result-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .result-card.truth::before{background:var(--accent2)}
+  .result-card.dare::before{background:var(--accent)}
+  .result-card.roast::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .result-card.visible{display:flex}
+  .result-type{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.2em}
+  .result-type.truth{color:var(--accent2)}
+  .result-type.dare{color:var(--accent)}
+  .result-type.roast{color:#ff8800}
+  .result-prompt{font-size:clamp(18px,3.5vw,22px);font-weight:600;line-height:1.5;color:var(--text)}
+  .result-note{font-size:14px;color:var(--muted);font-weight:300;line-height:1.5}
+  .spin-again-btn{padding:12px 32px;background:transparent;color:var(--accent);border:2px solid var(--accent);border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.1em;cursor:pointer;transition:all .15s;margin-top:4px}
+  .spin-again-btn:hover{background:var(--accent);color:#fff}
+  .history-label{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+  .history-list{display:flex;flex-direction:column;gap:8px;width:100%}
+  .history-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px;animation:slide-in .3s cubic-bezier(.16,1,.3,1) both}
+  .history-badge{font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.15em;padding:3px 8px;border-radius:20px;flex-shrink:0}
+  .badge-truth{background:rgba(26,106,255,.15);color:var(--accent2)}
+  .badge-dare{background:rgba(224,31,31,.15);color:var(--accent)}
+  .badge-roast{background:rgba(255,136,0,.15);color:#ff8800}
+  @keyframes pop-in{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes slide-in{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<div class="game-wrap">
+  <div class="game-title"><span class="r">Raff</span> Roulette</div>
+  <div class="game-subtitle">Spin for a truth, dare or roast</div>
+  <div class="wheel-wrap">
+    <svg class="wheel-svg" id="wheel-svg" viewBox="0 0 200 200">
+      <!-- Segments: TRUTH (blue), DARE (red), ROAST (orange), repeat x4 -->
+    </svg>
+    <div class="wheel-pointer"></div>
+  </div>
+  <button class="spin-btn" id="spin-btn" onclick="spin()">SPIN</button>
+  <div class="result-card" id="result-card">
+    <div class="result-type" id="result-type">TRUTH</div>
+    <div class="result-prompt" id="result-prompt"></div>
+    <div class="result-note" id="result-note"></div>
+    <button class="spin-again-btn" onclick="resetSpin()">Spin Again</button>
+  </div>
+  <div id="history-section" style="width:100%;display:flex;flex-direction:column;gap:12px;display:none">
+    <div class="history-label">This session</div>
+    <div class="history-list" id="history-list"></div>
+  </div>
+</div>
+<script>
+// ─── PROMPTS ─────────────────────────────────────────────────
+// CUSTOMIZE: Add truths, dares, and roasts below!
+const PROMPTS = {
+  truth: [
+    { prompt: "What's the most embarrassing thing you've done that you blamed on someone else?", note: "Be honest. Raff is watching." },
+    { prompt: "Have you ever pretended to be busy to avoid someone? Who?", note: "We already know the answer is yes." },
+    { prompt: "What's a habit you have that you'd deny having if asked?", note: "Raff has seventeen of these." },
+    { prompt: "What's the longest you've gone without replying to a text on purpose?", note: "Days? Weeks? Be specific." },
+    { prompt: "What show are you rewatching right now instead of watching something new?", note: "Comfort zone content exposed." },
+    { prompt: "What's the most recent lie you told to get out of something?", note: "Headache? Traffic? Dog emergency?" },
+    { prompt: "What's a food combination you like that others would judge you for?", note: "Raff has opinions. You should too." },
+    { prompt: "When was the last time you were actually on time for something?", note: "Take your time thinking about it." },
+    { prompt: "What's your current screen time average per day?", note: "Show the screen. Don't round down." },
+    { prompt: "Have you started anything in the last month that you haven't finished?", note: "List them. All of them." },
+  ],
+  dare: [
+    { prompt: "Text someone you haven't spoken to in over a month right now.", note: "No 'hey' allowed. Lead with something interesting." },
+    { prompt: "Do your best impression of Raff for 30 seconds.", note: "Commitment is mandatory." },
+    { prompt: "Send a voice note saying 'I'm on Raff time' to someone who'd get the joke.", note: "If nobody gets it, that's on you." },
+    { prompt: "Change your phone wallpaper to something Raff-related for 24 hours.", note: "Screenshot it. This is legally binding." },
+    { prompt: "Say three honest things about yourself that Raff knows but you rarely admit.", note: "Out loud. We're waiting." },
+    { prompt: "Attempt to eat something without checking your phone for 10 full minutes.", note: "Raff can't do this either. Can you?" },
+    { prompt: "Call someone instead of texting them for the next thing you need to say.", note: "Voice. Phone. Terrifying." },
+    { prompt: "Go to sleep before midnight tonight. Report back.", note: "Raff has never achieved this. You might be different." },
+    { prompt: "Put your phone face-down for the next 20 minutes. No peeking.", note: "We'll know if you cheat." },
+    { prompt: "Start one thing you've been putting off — right now, in the next 5 minutes.", note: "Even five minutes of it counts." },
+  ],
+  roast: [
+    { prompt: "Your to-do list is a wish list and you know it.", note: "— Raff.fun, with love" },
+    { prompt: "You set an alarm for 7am. You're getting up at 9:40. Minimum.", note: "We've done the math." },
+    { prompt: "Your 'I'll reply soon' has a half-life of 3 days.", note: "Scientifically verified." },
+    { prompt: "You're watching the same show for the 4th time because starting something new is scary.", note: "It's okay. We get it." },
+    { prompt: "You said 'I'm almost ready' 25 minutes ago and you just found your other shoe.", note: "Classic." },
+    { prompt: "Your room is 'organized chaos' but mostly just chaos.", note: "The chaos has structure. You just can't explain it." },
+    { prompt: "Your bedtime is 'soon' and 'soon' has never been before 1am.", note: "Not once. Ever." },
+    { prompt: "The project isn't done but your idea for the next project is fully formed.", note: "Priorities: secured." },
+    { prompt: "You left someone on read long enough that now it's a whole thing.", note: "And now you can't reply without context." },
+    { prompt: "You've started at least three 'life-changing habits' that lasted under two weeks.", note: "This month alone." },
+  ]
+};
+
+const SEGMENTS = ['truth','dare','roast','truth','dare','roast','truth','dare','roast','truth','dare','roast'];
+const SEG_COLORS = { truth: '#1a3a7a', dare: '#7a0a0a', roast: '#7a3a00' };
+const SEG_STROKE = { truth: '#1a6aff', dare: '#e01f1f', roast: '#ff8800' };
+const LABELS = { truth: 'TRUTH', dare: 'DARE', roast: 'ROAST' };
+
+let spinning = false, rotation = 0, history = [];
+
+// Build wheel SVG
+function buildWheel() {
+  const svg = document.getElementById('wheel-svg');
+  const n = SEGMENTS.length;
+  const cx = 100, cy = 100, r = 95, inner = 28;
+  const angleStep = (2 * Math.PI) / n;
+  let paths = '';
+  for (let i = 0; i < n; i++) {
+    const a1 = i * angleStep - Math.PI / 2;
+    const a2 = a1 + angleStep;
+    const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+    const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+    const ix1 = cx + inner * Math.cos(a1), iy1 = cy + inner * Math.sin(a1);
+    const ix2 = cx + inner * Math.cos(a2), iy2 = cy + inner * Math.sin(a2);
+    const seg = SEGMENTS[i];
+    const mid = (a1 + a2) / 2;
+    const lx = cx + (r * 0.62) * Math.cos(mid), ly = cy + (r * 0.62) * Math.sin(mid);
+    paths += `<path d="M${ix1},${iy1} L${x1},${y1} A${r},${r} 0 0,1 ${x2},${y2} L${ix2},${iy2} A${inner},${inner} 0 0,0 ${ix1},${iy1} Z" fill="${SEG_COLORS[seg]}" stroke="${SEG_STROKE[seg]}" stroke-width="1.5"/>`;
+    paths += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-family="Bebas Neue,sans-serif" font-size="8" fill="rgba(255,255,255,0.85)" letter-spacing="0.5">${LABELS[seg]}</text>`;
+  }
+  paths += `<circle cx="${cx}" cy="${cy}" r="${inner}" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1.5"/>`;
+  paths += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-family="Bebas Neue,sans-serif" font-size="11" fill="#555" letter-spacing="1">RAFF</text>`;
+  svg.innerHTML = paths;
+}
+
+function spin() {
+  if (spinning) return;
+  spinning = true;
+  document.getElementById('spin-btn').disabled = true;
+  document.getElementById('result-card').classList.remove('visible');
+
+  const extraSpins = 5 + Math.floor(Math.random() * 5);
+  const extraAngle = Math.random() * 360;
+  const totalRotation = extraSpins * 360 + extraAngle;
+  rotation += totalRotation;
+
+  const wheel = document.getElementById('wheel-svg');
+  wheel.style.transition = 'transform 4s cubic-bezier(.17,.67,.12,1)';
+  wheel.style.transform = `rotate(${rotation}deg)`;
+
+  setTimeout(() => {
+    spinning = false;
+    showResult(rotation % 360);
+  }, 4100);
+}
+
+function showResult(finalAngle) {
+  const n = SEGMENTS.length;
+  const segAngle = 360 / n;
+  // Pointer is at top (0 deg). The wheel rotated clockwise by finalAngle.
+  // Segment under pointer: (360 - finalAngle % 360) to find which landed at top
+  const normalised = ((360 - (finalAngle % 360)) % 360);
+  const idx = Math.floor(normalised / segAngle) % n;
+  const type = SEGMENTS[idx];
+
+  const pool = PROMPTS[type];
+  const item = pool[Math.floor(Math.random() * pool.length)];
+
+  const card = document.getElementById('result-card');
+  card.className = `result-card visible ${type}`;
+  const typeEl = document.getElementById('result-type');
+  typeEl.textContent = LABELS[type];
+  typeEl.className = `result-type ${type}`;
+  document.getElementById('result-prompt').textContent = item.prompt;
+  document.getElementById('result-note').textContent = item.note;
+
+  // Add to history
+  history.unshift({ type, prompt: item.prompt });
+  if (history.length > 5) history.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const section = document.getElementById('history-section');
+  const list = document.getElementById('history-list');
+  section.style.display = history.length ? 'flex' : 'none';
+  list.innerHTML = history.map((h,i) => `
+    <div class="history-item" style="animation-delay:${i*0.05}s">
+      <span class="history-badge badge-${h.type}">${LABELS[h.type]}</span>
+      <span>${h.prompt.substring(0,60)}${h.prompt.length>60?'…':''}</span>
+    </div>
+  `).join('');
+}
+
+function resetSpin() {
+  document.getElementById('result-card').classList.remove('visible');
+  document.getElementById('spin-btn').disabled = false;
+}
+
+buildWheel();
+</script>
+</body>
+</html>

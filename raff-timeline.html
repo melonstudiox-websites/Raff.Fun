@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Raff Timeline — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#e01f1f;--accent2:#1a6aff;--text:#f0ede6;--muted:#555}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:1000;opacity:.35}
+  .back-btn{position:fixed;top:18px;left:18px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:var(--surface);transition:all .15s;z-index:10}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  .game-wrap{width:100%;max-width:580px;padding:80px 24px 60px;display:flex;flex-direction:column;align-items:center;gap:28px;position:relative;z-index:1}
+  .game-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,11vw,80px);letter-spacing:.04em;text-align:center;line-height:1}
+  .game-title .r{color:var(--accent)}
+  .game-subtitle{color:var(--muted);font-size:14px;letter-spacing:.1em;text-transform:uppercase;text-align:center}
+  .score-display{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .score-display span{color:var(--accent);font-weight:600}
+  .round-info{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);text-align:center}
+  .instruction{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 20px;text-align:center;font-size:14px;color:var(--muted);line-height:1.5;width:100%}
+  .instruction strong{color:var(--text)}
+  .sortable-list{display:flex;flex-direction:column;gap:10px;width:100%}
+  .sort-item{background:var(--surface);border:2px solid var(--border);border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:14px;cursor:grab;transition:border-color .15s,transform .15s,box-shadow .15s;user-select:none;position:relative}
+  .sort-item:active{cursor:grabbing}
+  .sort-item.dragging{opacity:.5;transform:scale(.98)}
+  .sort-item.drag-over{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(26,106,255,.2)}
+  .sort-item .handle{color:var(--muted);font-size:18px;flex-shrink:0;cursor:grab}
+  .sort-item .item-num{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);flex-shrink:0;min-width:24px}
+  .sort-item .item-text{font-size:15px;font-weight:300;line-height:1.4;flex:1}
+  .sort-item.correct{border-color:#1aff6a;background:rgba(26,255,106,.05)}
+  .sort-item.wrong{border-color:var(--accent);background:rgba(224,31,31,.05)}
+  .check-btn{padding:16px 40px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.1em;cursor:pointer;transition:transform .1s,box-shadow .1s;width:100%}
+  .check-btn:hover{transform:scale(1.03);box-shadow:0 6px 24px rgba(224,31,31,.3)}
+  .result-banner{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 28px;text-align:center;display:none;flex-direction:column;gap:10px;align-items:center;animation:pop-in .3s cubic-bezier(.16,1,.3,1) both}
+  .result-banner.visible{display:flex}
+  .result-verdict{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:.06em}
+  .result-reason{font-size:15px;color:var(--muted);font-weight:300;line-height:1.5;max-width:400px}
+  .next-btn{padding:12px 32px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.1em;cursor:pointer;transition:transform .1s;margin-top:4px}
+  .next-btn:hover{transform:scale(1.05)}
+  .final-screen{display:none;width:100%;flex-direction:column;align-items:center;gap:20px;text-align:center;animation:pop-in .5s cubic-bezier(.16,1,.3,1) both}
+  .final-screen.visible{display:flex}
+  .final-big{font-size:80px;animation:float 2.5s ease-in-out infinite}
+  .final-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,8vw,64px);letter-spacing:.04em}
+  .final-score{font-family:'Bebas Neue',sans-serif;font-size:clamp(60px,12vw,96px);color:var(--accent);line-height:1}
+  .final-label{font-size:13px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+  .final-sub{font-size:16px;font-weight:300;color:var(--muted);max-width:340px;line-height:1.6}
+  .replay-btn{padding:16px 44px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.1em;cursor:pointer;transition:transform .1s;margin-top:8px}
+  .replay-btn:hover{transform:scale(1.05)}
+  @keyframes pop-in{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<div class="game-wrap">
+  <div class="game-title"><span class="r">Raff</span> Timeline</div>
+  <div class="game-subtitle">Put the events in the right order</div>
+  <div class="score-display">Score: <span id="score-val">0</span> / <span id="total-val">0</span></div>
+  <div id="main-ui" style="width:100%;display:flex;flex-direction:column;gap:20px;align-items:center">
+    <div class="round-info" id="round-info">Round 1 of 5</div>
+    <div class="instruction"><strong>Drag to reorder</strong> — put these from earliest to latest (or first to last in the sequence)</div>
+    <div class="sortable-list" id="sort-list"></div>
+    <button class="check-btn" id="check-btn" onclick="checkAnswer()">Check Order ✓</button>
+    <div class="result-banner" id="result-banner">
+      <div class="result-verdict" id="result-verdict"></div>
+      <div class="result-reason" id="result-reason"></div>
+      <button class="next-btn" onclick="nextRound()">Next →</button>
+    </div>
+  </div>
+  <div class="final-screen" id="final-screen">
+    <div class="final-big" id="final-emoji">📅</div>
+    <div class="final-title" id="final-title">Done!</div>
+    <div class="final-score" id="final-score">0/5</div>
+    <div class="final-label">perfect orders</div>
+    <div class="final-sub" id="final-sub"></div>
+    <button class="replay-btn" onclick="startGame()">Play Again</button>
+    <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+  </div>
+</div>
+<script>
+// ─── ROUNDS ─────────────────────────────────────────────────
+// Each round: a set of items the player must arrange in correct order (index 0 = first/earliest)
+// label: text shown on the card
+// context: the theme/question shown above
+// explanation: shown after checking
+// CUSTOMIZE: add your own Raff moments/phases/sequences!
+const ALL_ROUNDS = [
+  {
+    context: "Order Raff's typical Sunday from morning to night",
+    items: [
+      "Wake up, check phone for 40 minutes in bed",
+      "Say 'I should be productive today'",
+      "End up watching videos for 3 hours",
+      "Eat something questionable for lunch",
+      "Start something ambitious at 6pm",
+      "Give up at 8pm, put on a show",
+      "Stay up until 2am 'just one more episode'"
+    ],
+    explanation: "This is the Raff Sunday cycle. It has never deviated."
+  },
+  {
+    context: "How Raff approaches a new hobby — in order",
+    items: [
+      "Hears about a hobby, immediately interested",
+      "Researches it for 2 hours online",
+      "Tells everyone he's getting into it",
+      "Buys equipment or signs up for something",
+      "Does it 3–4 times with high enthusiasm",
+      "Slowly stops without officially quitting",
+      "Rediscovers the equipment months later"
+    ],
+    explanation: "The cycle is complete. The equipment sits in a corner."
+  },
+  {
+    context: "Raff's text reply process — in order",
+    items: [
+      "Receives text, sees notification",
+      "Opens it to read but doesn't reply",
+      "Thinks 'I'll reply in a sec'",
+      "Gets distracted for 6–8 hours",
+      "Sees it again, feels guilty",
+      "Waits even longer because it now feels weird",
+      "Replies with 'haha sorry just saw this'"
+    ],
+    explanation: "The apology at the end is genuine. The gap is not."
+  },
+  {
+    context: "Raff ordering food — step by step",
+    items: [
+      "Opens delivery app",
+      "Spends 15 minutes browsing",
+      "Settles on a place",
+      "Spends another 10 minutes on the menu",
+      "Adds item to cart, then changes mind",
+      "Orders the same thing he always gets",
+      "Wonders why he even looked at the menu"
+    ],
+    explanation: "The adventure always ends at the usual order."
+  },
+  {
+    context: "Raff attempting to sleep at a reasonable hour",
+    items: [
+      "'I'm going to sleep early tonight'",
+      "Gets in bed at 11pm — a record",
+      "Checks phone for 'a few minutes'",
+      "Falls into a 45-minute scroll",
+      "Watches 'just one' YouTube video",
+      "Looks at clock: 1:30am",
+      "Somehow stays up until 3am anyway"
+    ],
+    explanation: "Early bedtime is a dream. The 3am is the reality."
+  },
+];
+
+let rounds=[], current=0, score=0, dragSrc=null;
+
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
+
+function startGame(){
+  rounds=shuffle(ALL_ROUNDS).slice(0,5);
+  current=0;score=0;
+  document.getElementById('final-screen').classList.remove('visible');
+  document.getElementById('main-ui').style.display='flex';
+  renderRound();
+}
+
+function renderRound(){
+  const r=rounds[current];
+  document.getElementById('round-info').textContent=`Round ${current+1} of ${rounds.length}`;
+  document.getElementById('score-val').textContent=score;
+  document.getElementById('total-val').textContent=current;
+  document.getElementById('result-banner').classList.remove('visible');
+  document.getElementById('check-btn').style.display='block';
+  const shuffled=shuffle(r.items);
+  const list=document.getElementById('sort-list');
+  list.innerHTML=shuffled.map((item,i)=>`
+    <div class="sort-item" draggable="true" data-text="${encodeURIComponent(item)}" id="si-${i}">
+      <span class="handle">⠿</span>
+      <span class="item-num">${i+1}</span>
+      <span class="item-text">${item}</span>
+    </div>
+  `).join('');
+  attachDrag();
+}
+
+function attachDrag(){
+  const items=document.querySelectorAll('.sort-item');
+  items.forEach(item=>{
+    item.addEventListener('dragstart',e=>{dragSrc=item;item.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+    item.addEventListener('dragend',()=>{item.classList.remove('dragging');document.querySelectorAll('.sort-item').forEach(i=>i.classList.remove('drag-over'));updateNumbers();});
+    item.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';if(item!==dragSrc){item.classList.add('drag-over');}});
+    item.addEventListener('dragleave',()=>item.classList.remove('drag-over'));
+    item.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(item!==dragSrc){
+        const list=document.getElementById('sort-list');
+        const items=[...list.querySelectorAll('.sort-item')];
+        const srcIdx=items.indexOf(dragSrc);
+        const tgtIdx=items.indexOf(item);
+        if(srcIdx<tgtIdx)list.insertBefore(dragSrc,item.nextSibling);
+        else list.insertBefore(dragSrc,item);
+      }
+    });
+  });
+}
+
+function updateNumbers(){
+  document.querySelectorAll('.sort-item .item-num').forEach((el,i)=>el.textContent=i+1);
+}
+
+function checkAnswer(){
+  const r=rounds[current];
+  const currentOrder=[...document.querySelectorAll('.sort-item')].map(el=>decodeURIComponent(el.dataset.text));
+  const correct=JSON.stringify(currentOrder)===JSON.stringify(r.items);
+  if(correct)score++;
+  document.querySelectorAll('.sort-item').forEach((el,i)=>{
+    el.setAttribute('draggable','false');
+    el.style.cursor='default';
+    const text=decodeURIComponent(el.dataset.text);
+    const correctPos=r.items.indexOf(text);
+    el.classList.add(correctPos===i?'correct':'wrong');
+  });
+  document.getElementById('check-btn').style.display='none';
+  const v=document.getElementById('result-verdict');
+  v.textContent=correct?'✅ Perfect Order!':'❌ Not Quite';
+  v.style.color=correct?'#1aff6a':'var(--accent)';
+  document.getElementById('result-reason').textContent=r.explanation;
+  document.getElementById('result-banner').classList.add('visible');
+}
+
+function nextRound(){
+  current++;
+  if(current>=rounds.length)showFinal();
+  else renderRound();
+}
+
+function showFinal(){
+  document.getElementById('main-ui').style.display='none';
+  document.getElementById('final-screen').classList.add('visible');
+  const pct=score/rounds.length;
+  document.getElementById('final-score').textContent=`${score}/${rounds.length}`;
+  let e,t,s;
+  if(pct===1){e='🏆';t='Raff Historian';s='You\'ve documented him perfectly. Concerning.'}
+  else if(pct>=0.6){e='📅';t='Good Memory!';s='You know the Raff sequence pretty well.'}
+  else{e='💀';t='Scrambled';s='Raff himself couldn\'t put his life in order. Relatable.'}
+  document.getElementById('final-emoji').textContent=e;
+  document.getElementById('final-title').textContent=t;
+  document.getElementById('final-sub').textContent=s;
+}
+startGame();
+</script>
+</body>
+</html>

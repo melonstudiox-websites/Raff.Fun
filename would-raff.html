@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Would Raff? — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e0e;
+    --surface: #181818;
+    --border: #2a2a2a;
+    --accent: #f0e040;
+    --accent2: #ff5c35;
+    --text: #f0ede6;
+    --muted: #666;
+    --yes: #43e97b;
+    --no: #ff5c35;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.35;
+  }
+
+  .back-btn {
+    position: fixed;
+    top: 18px;
+    left: 18px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    background: var(--surface);
+    transition: all 0.15s;
+    z-index: 10;
+  }
+  .back-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .game-wrap {
+    width: 100%;
+    max-width: 600px;
+    padding: 80px 24px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .game-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 12vw, 80px);
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1;
+  }
+  .game-title .highlight { color: var(--accent); }
+
+  .progress-bar-wrap {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.4s cubic-bezier(.16,1,.3,1);
+  }
+
+  .score-display {
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .score-display span { color: var(--accent); font-weight: 600; }
+
+  /* ── card ── */
+  .question-card {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 48px 36px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .question-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  .q-number {
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .q-text {
+    font-size: clamp(20px, 4vw, 26px);
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text);
+  }
+
+  /* ── buttons ── */
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    width: 100%;
+  }
+
+  .vote-btn {
+    padding: 20px 0;
+    border-radius: 16px;
+    border: 2px solid transparent;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: transform 0.12s cubic-bezier(.16,1,.3,1), box-shadow 0.12s, background 0.12s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .vote-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .vote-btn:active::after { opacity: 0.1; }
+
+  .btn-yes {
+    background: rgba(67, 233, 123, 0.12);
+    border-color: rgba(67, 233, 123, 0.3);
+    color: var(--yes);
+  }
+  .btn-yes:hover {
+    background: rgba(67, 233, 123, 0.22);
+    border-color: var(--yes);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(67,233,123,0.2);
+  }
+
+  .btn-no {
+    background: rgba(255, 92, 53, 0.12);
+    border-color: rgba(255, 92, 53, 0.3);
+    color: var(--no);
+  }
+  .btn-no:hover {
+    background: rgba(255, 92, 53, 0.22);
+    border-color: var(--no);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(255,92,53,0.2);
+  }
+
+  /* ── reveal ── */
+  .reveal {
+    display: none;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 36px;
+    text-align: center;
+    gap: 12px;
+    flex-direction: column;
+    align-items: center;
+    animation: pop-in 0.35s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  .reveal.visible { display: flex; }
+
+  @keyframes pop-in {
+    from { opacity: 0; transform: scale(0.94) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .reveal-verdict {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    letter-spacing: 0.06em;
+  }
+  .verdict-yes { color: var(--yes); }
+  .verdict-no  { color: var(--no); }
+
+  .reveal-reason {
+    font-size: 16px;
+    font-weight: 300;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 400px;
+  }
+
+  .reveal-result-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .badge-correct {
+    background: rgba(67,233,123,0.15);
+    color: var(--yes);
+    border: 1px solid rgba(67,233,123,0.3);
+  }
+  .badge-wrong {
+    background: rgba(255,92,53,0.15);
+    color: var(--no);
+    border: 1px solid rgba(255,92,53,0.3);
+  }
+
+  .next-btn {
+    padding: 14px 36px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 100px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    margin-top: 8px;
+  }
+  .next-btn:hover {
+    transform: scale(1.04);
+    box-shadow: 0 6px 24px rgba(240,224,64,0.3);
+  }
+
+  /* ── final screen ── */
+  .final-screen {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    text-align: center;
+    animation: pop-in 0.5s cubic-bezier(.16,1,.3,1) both;
+  }
+  .final-screen.visible { display: flex; }
+
+  .final-big {
+    font-size: 80px;
+    line-height: 1;
+    animation: float 2.5s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .final-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(40px, 8vw, 64px);
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+  }
+
+  .final-score-big {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(60px, 14vw, 100px);
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .final-label {
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .final-verdict-text {
+    font-size: 18px;
+    font-weight: 300;
+    color: var(--muted);
+    max-width: 380px;
+    line-height: 1.6;
+  }
+  .final-verdict-text strong { color: var(--text); font-weight: 600; }
+
+  .replay-btn {
+    padding: 16px 44px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 100px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    margin-top: 12px;
+  }
+  .replay-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 28px rgba(240,224,64,0.3);
+  }
+
+  /* answer flash effect */
+  body.flash-yes { animation: flash-yes-anim 0.35s ease; }
+  body.flash-no  { animation: flash-no-anim 0.35s ease; }
+
+  @keyframes flash-yes-anim {
+    0%,100% { background: var(--bg); }
+    40% { background: #0d2a17; }
+  }
+  @keyframes flash-no-anim {
+    0%,100% { background: var(--bg); }
+    40% { background: #2a0e0a; }
+  }
+</style>
+</head>
+<body>
+
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+
+<div class="game-wrap">
+
+  <div class="game-title">Would <span class="highlight">Raff</span>?</div>
+
+  <!-- QUIZ UI -->
+  <div id="quiz-ui" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:24px;">
+
+    <div style="width:100%;display:flex;flex-direction:column;gap:10px;align-items:center;">
+      <div class="score-display">Score: <span id="score-val">0</span> / <span id="total-val">0</span></div>
+      <div class="progress-bar-wrap" style="width:100%;">
+        <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="question-card" id="q-card">
+      <div class="q-number" id="q-number">Question 1 of 10</div>
+      <div class="q-text" id="q-text">Loading...</div>
+    </div>
+
+    <div class="btn-row" id="btn-row">
+      <button class="vote-btn btn-yes" onclick="answer(true)">✅ Would</button>
+      <button class="vote-btn btn-no"  onclick="answer(false)">❌ Wouldn't</button>
+    </div>
+
+    <div class="reveal" id="reveal">
+      <div class="reveal-verdict" id="reveal-verdict">YES</div>
+      <div class="reveal-reason" id="reveal-reason"></div>
+      <div id="result-badge"></div>
+      <button class="next-btn" onclick="nextQuestion()">Next →</button>
+    </div>
+
+  </div>
+
+  <!-- FINAL SCREEN -->
+  <div class="final-screen" id="final-screen">
+    <div class="final-big" id="final-emoji">🎉</div>
+    <div class="final-title" id="final-title">You know Raff!</div>
+    <div class="final-score-big" id="final-score-big">0/10</div>
+    <div class="final-label">correct answers</div>
+    <div class="final-verdict-text" id="final-verdict-text"></div>
+    <button class="replay-btn" onclick="startGame()">Play Again</button>
+    <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px;">
+      ← More games
+    </a>
+  </div>
+
+</div>
+
+<script>
+// ─── QUESTIONS ───────────────────────────────
+// answer: true = YES Raff would, false = NO he wouldn't
+// Edit these freely — add as many as you like!
+const ALL_QUESTIONS = [
+  {
+    text: "Eat an entire pizza by himself in one sitting",
+    answer: true,
+    reason: "Raff absolutely would. No hesitation."
+  },
+  {
+    text: "Show up 30 minutes late and blame traffic",
+    answer: true,
+    reason: "Classic Raff move. 100% true."
+  },
+  {
+    text: "Read the instructions before assembling furniture",
+    answer: false,
+    reason: "Raff would wing it and end up with extra screws."
+  },
+  {
+    text: "Stay up until 3am for no reason",
+    answer: true,
+    reason: "This is practically Raff's hobby."
+  },
+  {
+    text: "Apologize first after an argument",
+    answer: false,
+    reason: "He'd wait it out. Stubborn as a rock."
+  },
+  {
+    text: "Claim he's 'not even tired' and then immediately fall asleep",
+    answer: true,
+    reason: "A tale as old as time with Raff."
+  },
+  {
+    text: "Spend 20 minutes picking what to watch and then rewatch something he's already seen",
+    answer: true,
+    reason: "Every. Single. Time."
+  },
+  {
+    text: "Learn a skill just to immediately forget about it",
+    answer: true,
+    reason: "Raff once 'got really into chess' for one week."
+  },
+  {
+    text: "Reply to texts within 5 minutes",
+    answer: false,
+    reason: "Raff leaves you on read for hours then acts like nothing happened."
+  },
+  {
+    text: "Try a weird food combination and insist it's actually good",
+    answer: true,
+    reason: "Raff has strong and incorrect opinions about food."
+  },
+  {
+    text: "Finish a project before the deadline",
+    answer: false,
+    reason: "The deadline IS the start time for Raff."
+  },
+  {
+    text: "Laugh at his own jokes before finishing them",
+    answer: true,
+    reason: "He can't help it — he finds himself hilarious."
+  },
+];
+
+// ─── GAME STATE ──────────────────────────────
+let questions = [];
+let current = 0;
+let score = 0;
+let answered = false;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startGame() {
+  questions = shuffle(ALL_QUESTIONS).slice(0, 10);
+  current = 0;
+  score = 0;
+  answered = false;
+
+  document.getElementById('final-screen').classList.remove('visible');
+  document.getElementById('quiz-ui').style.display = 'flex';
+  document.getElementById('reveal').classList.remove('visible');
+  document.getElementById('btn-row').style.display = 'grid';
+
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = questions[current];
+  const total = questions.length;
+
+  document.getElementById('q-number').textContent = `Question ${current + 1} of ${total}`;
+  document.getElementById('q-text').textContent = q.text;
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('total-val').textContent = current;
+  document.getElementById('progress-fill').style.width = `${(current / total) * 100}%`;
+  document.getElementById('reveal').classList.remove('visible');
+  document.getElementById('btn-row').style.display = 'grid';
+  answered = false;
+
+  // animate card
+  const card = document.getElementById('q-card');
+  card.style.animation = 'none';
+  card.offsetHeight;
+  card.style.animation = 'pop-in 0.35s cubic-bezier(.16,1,.3,1) both';
+}
+
+function answer(userAnswer) {
+  if (answered) return;
+  answered = true;
+
+  const q = questions[current];
+  const correct = userAnswer === q.answer;
+  if (correct) score++;
+
+  // flash bg
+  const cls = q.answer ? 'flash-yes' : 'flash-no';
+  document.body.classList.add(cls);
+  setTimeout(() => document.body.classList.remove(cls), 400);
+
+  // show reveal
+  const verdictEl = document.getElementById('reveal-verdict');
+  verdictEl.textContent = q.answer ? 'WOULD ✅' : "WOULDN'T ❌";
+  verdictEl.className = 'reveal-verdict ' + (q.answer ? 'verdict-yes' : 'verdict-no');
+
+  document.getElementById('reveal-reason').textContent = q.reason;
+
+  const badge = document.getElementById('result-badge');
+  if (correct) {
+    badge.innerHTML = '<span class="reveal-result-badge badge-correct">✓ You got it right!</span>';
+  } else {
+    badge.innerHTML = '<span class="reveal-result-badge badge-wrong">✗ Wrong guess</span>';
+  }
+
+  document.getElementById('btn-row').style.display = 'none';
+  document.getElementById('reveal').classList.add('visible');
+}
+
+function nextQuestion() {
+  current++;
+  if (current >= questions.length) {
+    showFinal();
+  } else {
+    renderQuestion();
+  }
+}
+
+function showFinal() {
+  document.getElementById('quiz-ui').style.display = 'none';
+  document.getElementById('final-screen').classList.add('visible');
+
+  const total = questions.length;
+  const pct = score / total;
+
+  document.getElementById('final-score-big').textContent = `${score}/${total}`;
+  document.getElementById('progress-fill').style.width = `${(score/total)*100}%`;
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('total-val').textContent = total;
+
+  let emoji, title, verdict;
+  if (pct === 1) {
+    emoji = '🏆'; title = 'You ARE Raff!';
+    verdict = `A <strong>perfect score</strong>. You know Raff better than he knows himself. Frightening, honestly.`;
+  } else if (pct >= 0.8) {
+    emoji = '🎯'; title = 'Raff Expert!';
+    verdict = `You know Raff really well. Only a few surprises — pretty impressive.`;
+  } else if (pct >= 0.6) {
+    emoji = '😄'; title = 'Pretty Good!';
+    verdict = `Solid Raff knowledge. You clearly spend time around him, for better or worse.`;
+  } else if (pct >= 0.4) {
+    emoji = '🤔'; title = 'Getting There...';
+    verdict = `You know <em>some</em> Raff things. Study up — he's a complex character.`;
+  } else {
+    emoji = '💀'; title = 'Do You Even Know Raff?';
+    verdict = `Have you actually met him? These results are concerning.`;
+  }
+
+  document.getElementById('final-emoji').textContent = emoji;
+  document.getElementById('final-title').textContent = title;
+  document.getElementById('final-verdict-text').innerHTML = verdict;
+}
+
+// Start!
+startGame();
+</script>
+</body>
+</html>

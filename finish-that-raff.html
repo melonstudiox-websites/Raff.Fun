@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Finish That Raff — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0a0a0a; --surface:#111; --border:#1e1e1e; --accent:#e01f1f; --accent2:#1a6aff; --text:#f0ede6; --muted:#555; }
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:1000;opacity:.35}
+  .back-btn{position:fixed;top:18px;left:18px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:var(--surface);transition:all .15s;z-index:10}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  .game-wrap{width:100%;max-width:620px;padding:80px 24px 60px;display:flex;flex-direction:column;align-items:center;gap:28px;position:relative;z-index:1}
+  .game-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,10vw,72px);letter-spacing:.04em;text-align:center;line-height:1}
+  .game-title .r{color:var(--accent)}
+  .game-subtitle{color:var(--muted);font-size:14px;letter-spacing:.1em;text-transform:uppercase}
+  .progress-bar-wrap{width:100%;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+  .progress-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s cubic-bezier(.16,1,.3,1)}
+  .score-display{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .score-display span{color:var(--accent);font-weight:600}
+  .stem-card{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:40px 32px;text-align:center;position:relative;overflow:hidden}
+  .stem-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .stem-label{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+  .stem-text{font-size:clamp(20px,4vw,26px);font-weight:600;line-height:1.4;color:var(--text)}
+  .stem-blank{color:var(--accent);border-bottom:2px solid var(--accent);padding:0 8px;display:inline-block;min-width:80px}
+  .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
+  .opt-btn{padding:18px 16px;border-radius:14px;border:2px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:300;cursor:pointer;transition:all .15s;text-align:center;line-height:1.4}
+  .opt-btn:hover{border-color:#333;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.3)}
+  .opt-btn.correct{border-color:#1aff6a;background:rgba(26,255,106,.08);color:#1aff6a}
+  .opt-btn.wrong{border-color:var(--accent);background:rgba(224,31,31,.08);color:var(--accent)}
+  .opt-btn.reveal-correct{border-color:#1aff6a;background:rgba(26,255,106,.05)}
+  .opt-btn.disabled{pointer-events:none}
+  .result-banner{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 28px;text-align:center;display:none;flex-direction:column;gap:10px;align-items:center;animation:pop-in .3s cubic-bezier(.16,1,.3,1) both}
+  .result-banner.visible{display:flex}
+  .result-verdict{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:.06em}
+  .result-reason{font-size:15px;color:var(--muted);font-weight:300;line-height:1.5;max-width:400px}
+  .next-btn{padding:12px 32px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.1em;cursor:pointer;transition:transform .1s;margin-top:4px}
+  .next-btn:hover{transform:scale(1.05)}
+  .final-screen{display:none;width:100%;flex-direction:column;align-items:center;gap:20px;text-align:center;animation:pop-in .5s cubic-bezier(.16,1,.3,1) both}
+  .final-screen.visible{display:flex}
+  .final-big{font-size:80px;animation:float 2.5s ease-in-out infinite}
+  .final-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,8vw,64px);letter-spacing:.04em}
+  .final-score{font-family:'Bebas Neue',sans-serif;font-size:clamp(60px,12vw,96px);color:var(--accent);line-height:1}
+  .final-label{font-size:13px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+  .final-sub{font-size:16px;font-weight:300;color:var(--muted);max-width:340px;line-height:1.6}
+  .replay-btn{padding:16px 44px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.1em;cursor:pointer;transition:transform .1s;margin-top:8px}
+  .replay-btn:hover{transform:scale(1.05)}
+  @keyframes pop-in{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+  @media(max-width:480px){.options-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<div class="game-wrap">
+  <div class="game-title">Finish That <span class="r">Raff</span></div>
+  <div class="game-subtitle">Complete the sentence the Raff way</div>
+  <div style="width:100%;display:flex;flex-direction:column;gap:10px;align-items:center">
+    <div class="score-display">Score: <span id="score-val">0</span> / <span id="total-val">0</span></div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+  <div id="main-ui" style="width:100%;display:flex;flex-direction:column;gap:20px;align-items:center">
+    <div class="stem-card">
+      <div class="stem-label" id="q-label">Question 1 of 10</div>
+      <div class="stem-text" id="stem-text">Loading...</div>
+    </div>
+    <div class="options-grid" id="options-grid"></div>
+    <div class="result-banner" id="result-banner">
+      <div class="result-verdict" id="result-verdict"></div>
+      <div class="result-reason" id="result-reason"></div>
+      <button class="next-btn" onclick="nextQ()">Next →</button>
+    </div>
+  </div>
+  <div class="final-screen" id="final-screen">
+    <div class="final-big" id="final-emoji">🎉</div>
+    <div class="final-title" id="final-title">Result</div>
+    <div class="final-score" id="final-score">0/10</div>
+    <div class="final-label">correct</div>
+    <div class="final-sub" id="final-sub"></div>
+    <button class="replay-btn" onclick="startGame()">Play Again</button>
+    <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+  </div>
+</div>
+<script>
+// ─── QUESTIONS ──────────────────────────────────────────────
+// stem: the setup line (use ___ for blank, shown at end)
+// correct: the correct ending (index 0–3, refers to options array)
+// options: 4 choices. Put the correct one at correctIndex.
+// correctIndex: which option (0-based) is correct
+// reason: shown after answer
+// CUSTOMIZE: edit or add questions freely!
+const ALL_QUESTIONS = [
+  {
+    stem: "I'll start the diet...",
+    options: ["right after this snack", "on Monday", "never, actually", "tomorrow for real this time"],
+    correctIndex: 1,
+    reason: "It's always Monday. Monday is a mythical concept for Raff."
+  },
+  {
+    stem: "I'm almost ready, just give me...",
+    options: ["one more minute", "five more minutes", "thirty more minutes", "I need to shower first"],
+    correctIndex: 1,
+    reason: "Five minutes from Raff is legally defined as 25–40 minutes."
+  },
+  {
+    stem: "I didn't mean to stay up this late, I just...",
+    options: ["lost track of time", "one more episode turned into eight", "couldn't sleep anyway", "forgot what time zones are"],
+    correctIndex: 1,
+    reason: "The episode spiral is Raff's most reliable trait."
+  },
+  {
+    stem: "I've been meaning to reply but...",
+    options: ["I lost the notification", "it felt weird after so long", "I forgot", "my thumbs were tired"],
+    correctIndex: 1,
+    reason: "The reply window closes after 48 hours. Raff won't re-open it."
+  },
+  {
+    stem: "The instructions are unnecessary because...",
+    options: ["I've seen worse puzzles", "I'm built different", "I can figure it out", "they're probably wrong anyway"],
+    correctIndex: 2,
+    reason: "Raff backs himself against any manual ever written."
+  },
+  {
+    stem: "This is my last snack, after this I'm...",
+    options: ["going to bed", "getting another snack", "brushing my teeth", "watching one more thing"],
+    correctIndex: 1,
+    reason: "The last snack is always a lie."
+  },
+  {
+    stem: "I'm not procrastinating, I'm...",
+    options: ["thinking about it", "doing research", "warming up", "in flow state"],
+    correctIndex: 0,
+    reason: "Thinking about it is the official Raff pre-work phase."
+  },
+  {
+    stem: "Yeah I know the movie, I saw...",
+    options: ["the whole thing", "most of it", "the beginning", "a clip on YouTube"],
+    correctIndex: 1,
+    reason: "Most of it. Always most of it. The ending is a mystery."
+  },
+  {
+    stem: "I'm not tired, I'm just...",
+    options: ["blinking slowly", "resting my eyes", "in low-power mode", "being still"],
+    correctIndex: 1,
+    reason: "Resting my eyes is Raff for 'I'm about to snore.'"
+  },
+  {
+    stem: "I'll clean my room...",
+    options: ["this weekend", "when I have time", "right now actually, wait no", "before someone comes over"],
+    correctIndex: 3,
+    reason: "The only event that triggers Raff cleaning is incoming guests."
+  },
+];
+
+let questions=[], current=0, score=0;
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
+
+function startGame(){
+  questions=shuffle(ALL_QUESTIONS).slice(0,8);
+  current=0;score=0;
+  document.getElementById('final-screen').classList.remove('visible');
+  document.getElementById('main-ui').style.display='flex';
+  document.getElementById('result-banner').classList.remove('visible');
+  renderQ();
+}
+
+function renderQ(){
+  const q=questions[current];
+  document.getElementById('q-label').textContent=`Question ${current+1} of ${questions.length}`;
+  document.getElementById('stem-text').textContent=q.stem+'  ___';
+  document.getElementById('score-val').textContent=score;
+  document.getElementById('total-val').textContent=current;
+  document.getElementById('progress-fill').style.width=`${(current/questions.length)*100}%`;
+  document.getElementById('result-banner').classList.remove('visible');
+  const grid=document.getElementById('options-grid');
+  // Shuffle option order but remember correct
+  const indices=shuffle([0,1,2,3]);
+  grid.innerHTML=indices.map(i=>`
+    <button class="opt-btn" onclick="pick(${i})">"...${q.options[i]}"</button>
+  `).join('');
+}
+
+function pick(chosenIdx){
+  const q=questions[current];
+  const correct=chosenIdx===q.correctIndex;
+  if(correct)score++;
+  const btns=document.querySelectorAll('.opt-btn');
+  btns.forEach(b=>{
+    b.classList.add('disabled');
+    const txt=b.textContent.trim().replace(/^"\.\.\./, '').replace(/"$/,'');
+    const matchIdx=q.options.findIndex(o=>o===txt);
+    if(matchIdx===q.correctIndex)b.classList.add('reveal-correct');
+    if(matchIdx===chosenIdx&&!correct)b.classList.add('wrong');
+    if(matchIdx===chosenIdx&&correct)b.classList.add('correct');
+  });
+  const v=document.getElementById('result-verdict');
+  v.textContent=correct?'✅ Correct!':'❌ Wrong!';
+  v.style.color=correct?'#1aff6a':'var(--accent)';
+  document.getElementById('result-reason').textContent=q.reason;
+  document.getElementById('result-banner').classList.add('visible');
+}
+
+function nextQ(){
+  current++;
+  if(current>=questions.length)showFinal();
+  else renderQ();
+}
+
+function showFinal(){
+  document.getElementById('main-ui').style.display='none';
+  document.getElementById('final-screen').classList.add('visible');
+  const pct=score/questions.length;
+  document.getElementById('final-score').textContent=`${score}/${questions.length}`;
+  let e,t,s;
+  if(pct===1){e='🏆';t='You Think Like Raff';s='Concerning. Impressive. Both.'}
+  else if(pct>=0.75){e='🎯';t='Sharp!';s='You finish Raff\'s sentences better than he does.'}
+  else if(pct>=0.5){e='😄';t='Getting There';s='You know the vibe. A few surprises.'}
+  else{e='💀';t='Room to Grow';s='You clearly don\'t spend enough time with Raff.'}
+  document.getElementById('final-emoji').textContent=e;
+  document.getElementById('final-title').textContent=t;
+  document.getElementById('final-sub').textContent=s;
+}
+startGame();
+</script>
+</body>
+</html>
