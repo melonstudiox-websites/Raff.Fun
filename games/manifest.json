@@ -5,42 +5,42 @@
     "description": "How well do you know what Raff would do?",
     "emoji": "🤔",
     "color": ["#ff6b35", "#f7c59f"]
-  }
+  },
   {
     "id": "fin-the-raff",
     "title": "Finish That Raff!",
     "description": "Can you complete Raff's Sentences",
     "emoji": "🗣️",
     "color": ["#ff6b35", "#f7c59f"]
-  }
+  },
   {
     "id": "raff-or-cap",
     "title": "Raff Or Cap?",
     "description": "Are these facts really Raff?",
     "emoji": "🧢",
     "color": ["#ff6b35", "#f7c59f"]
-  }
+  },
   {
     "id": "raff-or-raff",
     "title": "Raff or Raff?",
     "description": "Which one is it?",
     "emoji": "👍",
     "color": ["#ff6b35", "#f7c59f"]
-  }
+  },
   {
     "id": "raff-reaction",
     "title": "Raff Reaction!",
     "description": "React How Raff Would",
     "emoji": "😡",
     "color": ["#ff6b35", "#f7c59f"]
-  }
+  },
   {
     "id": "raff-roullete",
     "title": "Raff Roullete",
     "description": "Spin the wheel for something Raff",
     "emoji": "🛞",
     "color": ["#ff6b35", "#f7c59f"]
-  }
+  },
   {
     "id": "raff-timeline",
     "title": "Raff Timeline",
