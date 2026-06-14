@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snack Tower — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#fa709a;--accent2:#fee140;--text:#f0ede6;--muted:#666}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:rgba(17,17,17,.7);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  #stage{position:fixed;inset:0;z-index:1}
+  #stage canvas{display:block;width:100%;height:100%}
+  .hud{position:fixed;top:16px;left:0;right:0;text-align:center;z-index:5;pointer-events:none}
+  .hud .t{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.06em;color:var(--muted)}
+  .hud .t .r{color:var(--accent)}
+  .hud .d{font-family:'Bebas Neue',sans-serif;font-size:46px;line-height:1;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.7)}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(5,5,5,.84);backdrop-filter:blur(3px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:var(--muted);font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--accent2);line-height:1}
+  .btn{padding:15px 46px;background:var(--accent);color:#fff;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s}
+  .btn:active{transform:scale(.95)}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.08em}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<div id="stage"></div>
+<div class="hud">
+  <div class="t">Snack <span class="r">Tower</span></div>
+  <div class="d" id="score">0</div>
+</div>
+
+<div class="overlay show" id="start">
+  <h1>Snack <span style="color:var(--accent)">Tower</span></h1>
+  <p>Raff wants every snack stacked into one impossible mega-snack. <b>Tap</b> to drop each one. They wobble. They lean. How high before it all comes crashing down?</p>
+  <button class="btn" onclick="Game.start()">Stack</button>
+  <div class="hint">tap / click / space to drop</div>
+</div>
+<div class="overlay" id="over">
+  <div class="lbl">Tower height</div>
+  <div class="big" id="finalScore">0</div>
+  <h1 id="verdict">Timber!</h1>
+  <p id="blurb"></p>
+  <button class="btn" onclick="Game.start()">Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Render,Runner,Bodies,Body,Composite,Events,Vector}=Matter;
+const SNACKS=['🍔','🍩','🍕','🧁','🍪','🌮','🥪','🍰','🥨','🍞'];
+
+const Game={
+  start(){
+    document.getElementById('start').classList.remove('show');
+    document.getElementById('over').classList.remove('show');
+    this.build();
+  },
+
+  build(){
+    if(this.render){Render.stop(this.render);this.render.canvas.remove();}
+    if(this.runner)Runner.stop(this.runner);
+    if(this.engine)Engine.clear(this.engine);
+
+    const W=window.innerWidth,H=window.innerHeight;this.W=W;this.H=H;
+    const engine=Engine.create();engine.gravity.y=1.0;this.engine=engine;
+    const render=Render.create({element:document.getElementById('stage'),engine,
+      options:{width:W,height:H,wireframes:false,background:'#120a10',pixelRatio:1,hasBounds:true}});
+    this.render=render;
+
+    const platY=H*0.82;this.platY=platY;
+    this.plat=Bodies.rectangle(W/2,platY+24,Math.min(W*0.5,200),48,{isStatic:true,chamfer:{radius:8},
+      render:{fillStyle:'#2a2a2a'}});
+    Composite.add(engine.world,this.plat);
+
+    this.snacks=[];this.score=0;this.dropY=platY-220;this.dir=1;this.speed=2.4;
+    this.current=null;this.dropped=false;this.settleT=0;this.topY=platY;this.over=false;
+    document.getElementById('score').textContent=0;
+    this.spawn();
+
+    Events.on(engine,'beforeUpdate',()=>this.tick());
+    Events.on(render,'afterRender',()=>this.afterRender());
+    const runner=Runner.create();this.runner=runner;Runner.run(runner,engine);Render.run(render);
+  },
+
+  spawn(){
+    const W=this.W;
+    const bw=44+Math.random()*22, bh=30;
+    const y=this.topY-150;
+    const s=Bodies.rectangle(W*0.5,y,bw,bh,{density:0.001,friction:0.7,frictionStatic:1,
+      chamfer:{radius:6},render:{fillStyle:'#fa709a'}});
+    s.emoji=SNACKS[Math.floor(Math.random()*SNACKS.length)];
+    Body.setStatic(s,true);
+    Composite.add(this.engine.world,s);
+    this.current=s;this.dropped=false;this.settleT=0;
+    this.dropY=y;this.cx=W*0.5;this.dir=Math.random()<.5?1:-1;
+    this.range=Math.min(W*0.34,200);
+  },
+
+  drop(){
+    if(this.over||!this.current||this.dropped)return;
+    Body.setStatic(this.current,false);
+    Body.setVelocity(this.current,{x:0,y:6});
+    this.dropped=true;this.settleT=0;
+  },
+
+  tick(){
+    if(this.over)return;
+    const cur=this.current;
+    if(cur&&!this.dropped){
+      // slide horizontally
+      this.cx+=this.dir*this.speed;
+      const W=this.W;
+      if(this.cx>W*0.5+this.range){this.cx=W*0.5+this.range;this.dir=-1;}
+      if(this.cx<W*0.5-this.range){this.cx=W*0.5-this.range;this.dir=1;}
+      Body.setPosition(cur,{x:this.cx,y:this.dropY});
+    } else if(cur&&this.dropped){
+      const v=Vector.magnitude(cur.velocity);
+      if(v<0.5&&cur.position.y<this.platY+10){this.settleT++;}else{this.settleT=0;}
+      // landed off the tower / on floor -> game over check after settle
+      if(this.settleT>22){
+        this.place();
+      }
+      // fell past platform = topple
+      if(cur.position.y>this.platY+120){this.fail();}
+    }
+    // any earlier snack falls off -> topple
+    for(const s of this.snacks){
+      if(s.position.y>this.platY+140){this.fail();return;}
+    }
+  },
+
+  place(){
+    const cur=this.current;
+    this.snacks.push(cur);
+    this.score++;
+    document.getElementById('score').textContent=this.score;
+    this.topY=Math.min(this.topY,cur.bounds.min.y);
+    this.speed=Math.min(2.4+this.score*0.12,7);
+    this.current=null;
+    setTimeout(()=>{if(!this.over)this.spawn();},120);
+  },
+
+  afterRender(){
+    // camera: keep top of tower in view
+    const r=this.render;
+    const focusY=Math.min(this.platY-60, this.topY+120);
+    r.bounds.min.x=0;r.bounds.max.x=this.W;
+    let top=Math.min(this.platY, this.topY-200);
+    r.bounds.min.y=top; r.bounds.max.y=top+this.H;
+    // keep platform near bottom if tower short
+    if(this.platY - top < this.H*0.7){ r.bounds.min.y=this.platY-this.H*0.78; r.bounds.max.y=r.bounds.min.y+this.H; }
+    const ctx=r.context;
+    const w2s=(wx,wy)=>({x:(wx-r.bounds.min.x)*(this.W/(r.bounds.max.x-r.bounds.min.x)),
+                         y:(wy-r.bounds.min.y)*(this.H/(r.bounds.max.y-r.bounds.min.y))});
+    ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
+    const all=this.current?this.snacks.concat([this.current]):this.snacks;
+    for(const s of all){
+      const p=w2s(s.position.x,s.position.y);
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(s.angle);
+      ctx.font=(Math.min(s.bounds.max.x-s.bounds.min.x,40))+'px serif';
+      ctx.fillText(s.emoji,0,1);ctx.restore();
+    }
+    ctx.restore();
+  },
+
+  fail(){
+    if(this.over)return;this.over=true;
+    document.getElementById('finalScore').textContent=this.score;
+    let v,b;
+    if(this.score>=20){v='Snack Babel!';b='A tower so tall it has its own weather. Raff is legend.';}
+    else if(this.score>=12){v='Towering!';b='Serious altitude. Engineers want to study it.';}
+    else if(this.score>=6){v='Respectable';b='A solid snack stack before gravity filed a complaint.';}
+    else if(this.score>=2){v='Timber!';b='It stood briefly. Raff ate the wreckage. No evidence remains.';}
+    else {v='Instant Collapse';b='Down on the first wobble. Raff calls this "a snack platter".';}
+    document.getElementById('verdict').textContent=v;
+    document.getElementById('blurb').textContent=b;
+    setTimeout(()=>document.getElementById('over').classList.add('show'),650);
+  }
+};
+
+function drop(e){if(e.type==='keydown'&&e.code!=='Space')return;if(e.cancelable)e.preventDefault();Game.drop();}
+window.addEventListener('pointerdown',drop);
+window.addEventListener('keydown',drop);
+document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+</script>
+</body>
+</html>

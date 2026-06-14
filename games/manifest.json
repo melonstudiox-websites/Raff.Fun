@@ -47,5 +47,33 @@
     "description": "In what order would Raff do it?",
     "emoji": "⏰",
     "color": ["#12c2e9", "#c471ed"]
+  },
+  {
+    "id": "drive-raff",
+    "title": "Drive Raff",
+    "description": "Hold to gas it — don't flip. He's late!",
+    "emoji": "🚗",
+    "color": ["#30cfd0", "#667eea"]
+  },
+  {
+    "id": "yeet-the-raff",
+    "title": "Yeet the Raff",
+    "description": "Drag, release, fling him off the couch",
+    "emoji": "🛋️",
+    "color": ["#ee0979", "#ff6a00"]
+  },
+  {
+    "id": "alarm-smash",
+    "title": "Alarm Smash",
+    "description": "Demolish the alarm clock fortress",
+    "emoji": "🍖",
+    "color": ["#ff6b35", "#ffd275"]
+  },
+  {
+    "id": "snack-tower",
+    "title": "Snack Tower",
+    "description": "Stack the wobbling snacks sky-high",
+    "emoji": "🍔",
+    "color": ["#fa709a", "#fee140"]
   }
 ]

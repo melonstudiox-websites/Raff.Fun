@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Drive Raff — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#30cfd0;--accent2:#ffd200;--text:#f0ede6;--muted:#666}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:rgba(17,17,17,.7);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  #stage{position:fixed;inset:0;z-index:1}
+  #stage canvas{display:block;width:100%;height:100%}
+  .hud{position:fixed;top:16px;left:0;right:0;text-align:center;z-index:5;pointer-events:none}
+  .hud .t{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.06em;color:var(--muted)}
+  .hud .t .r{color:var(--accent)}
+  .hud .d{font-family:'Bebas Neue',sans-serif;font-size:40px;line-height:1;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.7)}
+  .pedal{position:fixed;bottom:0;left:0;right:0;height:34%;z-index:6;display:flex;align-items:flex-end;justify-content:center;padding-bottom:22px;pointer-events:none}
+  .pedal .lab{pointer-events:none;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);background:rgba(17,17,17,.6);padding:8px 18px;border-radius:100px;border:1px solid var(--border)}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(5,5,5,.84);backdrop-filter:blur(3px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:var(--muted);font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--accent2);line-height:1}
+  .btn{padding:15px 46px;background:var(--accent);color:#042;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s}
+  .btn:active{transform:scale(.95)}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.08em}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<div id="stage"></div>
+<div class="hud">
+  <div class="t">Drive <span class="r">Raff</span></div>
+  <div class="d"><span id="dist">0</span>m</div>
+</div>
+<div class="pedal"><div class="lab">hold anywhere to drive · release to coast</div></div>
+
+<div class="overlay show" id="start">
+  <h1>Drive <span style="color:var(--accent)">Raff</span></h1>
+  <p>Raff is late and his car is held together by snack wrappers. <b>Hold</b> to hit the gas, <b>release</b> to coast. Balance over the hills — flip and he's calling in "traffic".</p>
+  <button class="btn" onclick="Game.start()">Drive</button>
+  <div class="hint">hold screen / mouse / space</div>
+</div>
+<div class="overlay" id="over">
+  <div class="lbl" id="endlbl">Crashed at</div>
+  <div class="big"><span id="finalDist">0</span>m</div>
+  <h1 id="verdict">Wiped Out!</h1>
+  <p id="blurb"></p>
+  <button class="btn" id="againBtn" onclick="Game.start()">Try Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Render,Runner,Bodies,Body,Composite,Constraint,Events,Vector}=Matter;
+
+const Game={
+  start(){
+    document.getElementById('start').classList.remove('show');
+    document.getElementById('over').classList.remove('show');
+    this.build();
+  },
+
+  build(){
+    // teardown previous
+    if(this.render){Render.stop(this.render);this.render.canvas.remove();}
+    if(this.runner)Runner.stop(this.runner);
+    if(this.engine)Engine.clear(this.engine);
+
+    const W=window.innerWidth,H=window.innerHeight;
+    const engine=Engine.create();engine.gravity.y=1.1;
+    this.engine=engine;
+
+    const render=Render.create({
+      element:document.getElementById('stage'),engine,
+      options:{width:W,height:H,wireframes:false,background:'#0b1413',
+        pixelRatio:1,hasBounds:true}
+    });
+    this.render=render;
+
+    // ── terrain ──
+    const groundBase=H*0.62;
+    const segW=70, segs=120;
+    this.points=[];
+    let y=groundBase;
+    for(let i=0;i<=segs;i++){
+      const x=i*segW;
+      if(i<3){y=groundBase;}
+      else{
+        const amp=Math.min(8+i*1.4,90);
+        y=groundBase + Math.sin(i*0.55)*amp*0.6 + Math.sin(i*0.21)*amp + (Math.random()-0.5)*14;
+      }
+      this.points.push({x,y});
+    }
+    this.finishX=segs*segW-segW*2;
+    const terrain=[];
+    for(let i=0;i<this.points.length-1;i++){
+      const a=this.points[i],b=this.points[i+1];
+      const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+      const dx=b.x-a.x,dy=b.y-a.y;
+      const len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx);
+      const seg=Bodies.rectangle(mx,my+30,len+2,60,{isStatic:true,angle:ang,friction:1,
+        render:{fillStyle:'#15201f'}});
+      terrain.push(seg);
+    }
+    Composite.add(engine.world,terrain);
+
+    // ── car ──
+    const sx=segW*1.5, sy=groundBase-70;
+    const chassis=Bodies.rectangle(sx,sy,92,24,{density:0.0016,friction:0.4,
+      chamfer:{radius:8},render:{fillStyle:'#30cfd0'}});
+    const wheelOpt={friction:1,frictionStatic:2,density:0.004,restitution:0.05,
+      render:{fillStyle:'#1a1a1a',strokeStyle:'#444',lineWidth:3}};
+    const wA=Bodies.circle(sx-30,sy+22,17,wheelOpt);
+    const wB=Bodies.circle(sx+30,sy+22,17,wheelOpt);
+    const axle=(body,ox)=>Constraint.create({bodyA:chassis,pointA:{x:ox,y:18},bodyB:body,
+      stiffness:0.65,damping:0.2,length:0,render:{visible:false}});
+    const car=Composite.create();
+    Composite.add(car,[chassis,wA,wB,axle(wA,-30),axle(wB,30)]);
+    Composite.add(engine.world,car);
+    this.chassis=chassis;this.wA=wA;this.wB=wB;
+
+    this.held=false;this.dead=false;this.won=false;this.startX=chassis.position.x;
+    this.maxDist=0;
+
+    // drive + camera + crash
+    Events.on(engine,'beforeUpdate',()=>{
+      if(this.dead||this.won)return;
+      if(this.held){
+        wA.torque=0.7; wB.torque=0.7;
+      }else{
+        // gentle engine braking
+        wA.angularVelocity*=0.96; wB.angularVelocity*=0.96;
+      }
+      // crash: flipped over
+      let a=chassis.angle%(2*Math.PI); if(a>Math.PI)a-=2*Math.PI; if(a<-Math.PI)a+=2*Math.PI;
+      if(Math.abs(a)>2.3){this.fail('flip');}
+      // win
+      if(chassis.position.x>this.finishX){this.win();}
+      // fell off world
+      if(chassis.position.y>H+1200){this.fail('void');}
+    });
+
+    Events.on(render,'afterRender',()=>{this.hudCam();this.emojis();});
+
+    const runner=Runner.create();this.runner=runner;
+    Runner.run(runner,engine);Render.run(render);
+    this.W=W;this.H=H;
+  },
+
+  hudCam(){
+    const r=this.render,c=this.chassis;
+    const zoom=1; const vw=this.W,vh=this.H;
+    const cx=c.position.x, cy=c.position.y-40;
+    r.bounds.min.x=cx-vw*0.34; r.bounds.max.x=r.bounds.min.x+vw;
+    r.bounds.min.y=cy-vh*0.5;  r.bounds.max.y=r.bounds.min.y+vh;
+    // distance hud
+    const d=Math.max(0,Math.round((c.position.x-this.startX)/40));
+    this.maxDist=Math.max(this.maxDist,d);
+    document.getElementById('dist').textContent=this.maxDist;
+  },
+
+  w2s(wx,wy){
+    const r=this.render,b=r.bounds;
+    return {x:(wx-b.min.x)*(this.W/(b.max.x-b.min.x)),
+            y:(wy-b.min.y)*(this.H/(b.max.y-b.min.y))};
+  },
+
+  emojis(){
+    const ctx=this.render.context;
+    ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
+    // driver on chassis
+    const c=this.chassis;
+    const head=Vector.add(c.position,Vector.rotate({x:6,y:-20},c.angle));
+    const p=this.w2s(head.x,head.y);
+    ctx.translate(p.x,p.y);ctx.rotate(c.angle);
+    ctx.font='30px serif';ctx.fillText(this.dead?'😵':'😎',0,0);
+    ctx.restore();
+    // finish flag
+    const fy=this.groundYAt(this.finishX);
+    const f=this.w2s(this.finishX,fy-46);
+    if(f.x>-60&&f.x<this.W+60){ctx.save();ctx.font='44px serif';ctx.textAlign='center';ctx.fillText('🏁',f.x,f.y);ctx.restore();}
+  },
+
+  groundYAt(x){
+    const pts=this.points;const i=Math.max(0,Math.min(pts.length-2,Math.floor(x/70)));
+    const a=pts[i],b=pts[i+1];const t=(x-a.x)/(b.x-a.x||1);return a.y+(b.y-a.y)*t;
+  },
+
+  win(){
+    if(this.won||this.dead)return;this.won=true;
+    document.getElementById('endlbl').textContent='Made it —';
+    document.getElementById('verdict').textContent='On Time?!';
+    document.getElementById('finalDist').textContent=this.maxDist;
+    document.getElementById('blurb').textContent='Raff arrived before the meeting ended. Historians are baffled.';
+    this.finish();
+  },
+
+  fail(kind){
+    if(this.dead||this.won)return;this.dead=true;
+    document.getElementById('endlbl').textContent= kind==='void'?'Launched into orbit at':'Crashed at';
+    document.getElementById('finalDist').textContent=this.maxDist;
+    let v,b;
+    if(this.maxDist>=140){v='So Close!';b='Wiped out in sight of the finish. He blames the hill. And the car. And Tuesday.';}
+    else if(this.maxDist>=70){v='Yard Sale!';b='A spectacular tumble. Raff is fine. His pride is not.';}
+    else if(this.maxDist>=20){v='Wiped Out!';b='Barely left the driveway before physics had opinions.';}
+    else {v='...Already?';b='Flipped at the first bump. New record for fastest excuse.';}
+    document.getElementById('verdict').textContent=v;
+    document.getElementById('blurb').textContent=b;
+    this.finish();
+  },
+
+  finish(){
+    this.held=false;
+    setTimeout(()=>document.getElementById('over').classList.add('show'),700);
+  }
+};
+
+// input
+function down(e){if(e.type==='keydown'&&e.code!=='Space')return; if(e.cancelable)e.preventDefault(); Game.held=true;}
+function up(e){Game.held=false;}
+window.addEventListener('pointerdown',down);
+window.addEventListener('pointerup',up);
+window.addEventListener('pointercancel',up);
+window.addEventListener('keydown',down);
+window.addEventListener('keyup',e=>{if(e.code==='Space')Game.held=false;});
+document.querySelectorAll('.btn,.back-btn').forEach(el=>{el.addEventListener('pointerdown',e=>e.stopPropagation());});
+window.addEventListener('resize',()=>{if(Game.render&&!Game.dead&&!Game.won){/* keep simple: ignore live resize */}});
+</script>
+</body>
+</html>
