@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snack Hoops — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--accent:#ff6a00;--accent2:#ffd275;--muted:#888}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:#0a0a0a;color:#f0ede6;font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(255,255,255,.15);border-radius:100px;color:#fff;text-decoration:none;font-size:13px;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  #c{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:1}
+  .hud{position:fixed;top:16px;left:0;right:0;display:flex;justify-content:center;gap:30px;z-index:5;pointer-events:none;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+  .hud b{color:var(--accent2);font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.04em}
+  .hud .lives{color:#ff5c5c;font-size:20px}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(10,7,4,.85);backdrop-filter:blur(4px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:#bbb;font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--accent2);line-height:1}
+  .btn{padding:15px 46px;background:linear-gradient(135deg,var(--accent),#cc5500);color:#fff;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s;box-shadow:0 8px 20px rgba(255,106,0,.3)}
+  .btn:active{transform:scale(.95)}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<canvas id="c"></canvas>
+<div class="hud">
+  <span>Buckets <b id="score">0</b></span>
+  <span class="lives" id="lives">❤️❤️❤️</span>
+</div>
+
+<div class="overlay show" id="start">
+  <h1>Snack <span style="color:var(--accent)">Hoops</span></h1>
+  <p>Raff insists snacks taste better if you sink them first. <b>Flick</b> the snack into the bowl. Score and the bowl moves further away. Miss three times and snack time is over.</p>
+  <button class="btn" onclick="Game.start()">Shoot</button>
+  <div class="hint">flick toward the bowl &amp; release</div>
+</div>
+<div class="overlay" id="over">
+  <div class="lbl">Snacks sunk</div>
+  <div class="big" id="finalScore">0</div>
+  <h1 id="verdict">Swish!</h1>
+  <p id="blurb"></p>
+  <button class="btn" onclick="Game.start()">Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Bodies,Body,Composite,Vector}=Matter;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;}
+addEventListener('resize',resize);resize();
+const SNACKS=['🍩','🍪','🧁','🍔','🥯','🍙'];
+
+const Game={
+  best:+(localStorage.getItem('hoops-best')||0),
+  start(){document.getElementById('start').classList.remove('show');document.getElementById('over').classList.remove('show');
+    this.score=0;this.lives=3;document.getElementById('score').textContent=0;document.getElementById('lives').textContent='❤️❤️❤️';
+    this.build();if(!this.loopOn){this.loopOn=true;requestAnimationFrame(()=>this.frame());}},
+
+  build(){
+    const engine=Engine.create();engine.gravity.y=1.05;this.engine=engine;
+    this.particles=[];this.over=false;this.flying=false;this.dragging=false;this.judged=false;this.t=0;this.track=[];
+    this.groundY=H*0.9;
+    Composite.add(engine.world,Bodies.rectangle(W/2,this.groundY+200,W*3,400,{isStatic:true,friction:.8}));
+    this.startX=W*0.18;this.startY=this.groundY-40;
+    this.placeBowl(0);
+    this.spawnBall();
+  },
+
+  placeBowl(i){
+    const prog=Math.min(i,8);
+    this.bowlW=Math.max(70,108-prog*4);
+    this.bowlX=W*(0.55+Math.random()*0.28);
+    this.bowlY=this.groundY-(40+prog*16+Math.random()*60);
+    // rebuild static cup
+    if(this.cup)for(const s of this.cup)Composite.remove(this.engine.world,s);
+    const wallH=46,th=8,inner=this.bowlW;
+    const L=Bodies.rectangle(this.bowlX-inner/2,this.bowlY-wallH/2,th,wallH,{isStatic:true,friction:.5,restitution:.1});
+    const R=Bodies.rectangle(this.bowlX+inner/2,this.bowlY-wallH/2,th,wallH,{isStatic:true,friction:.5,restitution:.1});
+    const B=Bodies.rectangle(this.bowlX,this.bowlY,inner,th,{isStatic:true,friction:.6,restitution:.05});
+    this.cup=[L,R,B];Composite.add(this.engine.world,this.cup);
+    this.bowlTop=this.bowlY-wallH;
+  },
+
+  spawnBall(){if(this.ball)Composite.remove(this.engine.world,this.ball);
+    const b=Bodies.circle(this.startX,this.startY,16,{density:.0018,friction:.5,frictionAir:.004,restitution:.4});
+    b.emoji=SNACKS[(Math.random()*SNACKS.length)|0];this.ball=b;Body.setStatic(b,true);Composite.add(this.engine.world,b);
+    this.flying=false;this.judged=false;this.settleT=0;},
+
+  frame(){requestAnimationFrame(()=>this.frame());this.t++;
+    if(this.engine&&!this.over){this.step();Engine.update(this.engine,1000/60);}this.draw();},
+
+  step(){
+    const b=this.ball;if(!b)return;
+    if(this.flying&&!this.judged){
+      const v=Vector.magnitude(b.velocity);
+      if(v<0.7)this.settleT++;else this.settleT=0;
+      const inBowl=Math.abs(b.position.x-this.bowlX)<this.bowlW/2-4 && b.position.y>this.bowlTop && b.position.y<this.bowlY+6;
+      if(this.settleT>16){ if(inBowl)this.make();else this.miss(); }
+      if(b.position.y>H+80)this.miss();
+    }
+    for(const p of this.particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.2;p.life--;}this.particles=this.particles.filter(p=>p.life>0);
+  },
+
+  make(){if(this.judged)return;this.judged=true;this.score++;document.getElementById('score').textContent=this.score;
+    for(let i=0;i<18;i++){const a=Math.random()*6.28,s=2+Math.random()*4;this.particles.push({x:this.bowlX,y:this.bowlY-20,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:30,r:3,c:'255,210,117'});}
+    setTimeout(()=>{if(!this.over){this.placeBowl(this.score);this.spawnBall();}},600);},
+
+  miss(){if(this.judged)return;this.judged=true;this.lives--;
+    document.getElementById('lives').textContent='❤️'.repeat(Math.max(0,this.lives))+'🖤'.repeat(3-Math.max(0,this.lives));
+    if(this.lives<=0){setTimeout(()=>this.end(),600);}else setTimeout(()=>{if(!this.over)this.spawnBall();},650);},
+
+  draw(){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#2a1a08');sky.addColorStop(.5,'#3a2410');sky.addColorStop(1,'#1a1208');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    // floor
+    ctx.fillStyle='#241808';ctx.fillRect(0,this.groundY,W,H-this.groundY);
+    ctx.strokeStyle='rgba(255,106,0,.4)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,this.groundY);ctx.lineTo(W,this.groundY);ctx.stroke();
+    // bowl
+    ctx.save();
+    ctx.fillStyle='#c9d1d6';
+    ctx.beginPath();ctx.moveTo(this.bowlX-this.bowlW/2-6,this.bowlTop);ctx.lineTo(this.bowlX-this.bowlW/2,this.bowlY+6);
+    ctx.lineTo(this.bowlX+this.bowlW/2,this.bowlY+6);ctx.lineTo(this.bowlX+this.bowlW/2+6,this.bowlTop);ctx.stroke();
+    ctx.lineWidth=7;ctx.strokeStyle='#aeb6bb';ctx.stroke();
+    ctx.strokeStyle='#e8eef2';ctx.lineWidth=7;
+    ctx.beginPath();ctx.moveTo(this.bowlX-this.bowlW/2,this.bowlTop);ctx.lineTo(this.bowlX-this.bowlW/2+4,this.bowlY);ctx.lineTo(this.bowlX+this.bowlW/2-4,this.bowlY);ctx.lineTo(this.bowlX+this.bowlW/2,this.bowlTop);ctx.stroke();
+    // rim highlight
+    ctx.strokeStyle='#ff6a00';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(this.bowlX-this.bowlW/2-4,this.bowlTop);ctx.lineTo(this.bowlX+this.bowlW/2+4,this.bowlTop);ctx.stroke();
+    ctx.restore();
+    // ball
+    const b=this.ball;if(b){ctx.save();ctx.translate(b.position.x,b.position.y);ctx.rotate(b.angle);
+      ctx.fillStyle='#fff2c4';ctx.beginPath();ctx.arc(0,0,16,0,6.3);ctx.fill();
+      ctx.font='22px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(b.emoji,0,1);ctx.restore();}
+    // aim trail
+    if(this.dragging&&this.flick&&this.ball){const o=this.ball.position;
+      const vx=this.flick.x*0.22,vy=this.flick.y*0.22;ctx.fillStyle='rgba(255,255,255,.5)';
+      for(let s=1;s<=10;s++){const tt=s*2.6;const px=o.x+vx*tt,py=o.y+vy*tt+0.5*1.05*tt*tt;if(py>this.groundY)break;ctx.beginPath();ctx.arc(px,py,2.5,0,6.3);ctx.fill();}}
+    // particles
+    for(const p of this.particles){ctx.fillStyle='rgba('+p.c+','+(p.life/30)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.3);ctx.fill();}
+    if(!this.flying&&!this.dragging&&!this.over){ctx.fillStyle='rgba(255,210,117,'+(0.4+0.3*Math.sin(this.t*0.1))+')';ctx.font='14px DM Sans';ctx.textAlign='center';ctx.fillText('flick to shoot →',this.startX,this.startY-40);}
+  },
+
+  begin(sx,sy){if(this.flying||this.over||!this.ball)return;this.dragging=true;this.track=[{x:sx,y:sy,t:performance.now()}];this.flick=null;},
+  move(sx,sy){if(!this.dragging)return;this.track.push({x:sx,y:sy,t:performance.now()});if(this.track.length>6)this.track.shift();
+    const a=this.track[0],b=this.track[this.track.length-1];this.flick={x:b.x-a.x,y:b.y-a.y};},
+  release(){if(!this.dragging)return;this.dragging=false;if(this.flying||!this.ball)return;
+    const tr=this.track;if(tr.length<2)return;const a=tr[0],b=tr[tr.length-1];const dt=Math.max(16,b.t-a.t);
+    let vx=(b.x-a.x)/dt*16,vy=(b.y-a.y)/dt*16;const sp=Math.hypot(vx,vy);
+    if(sp<3)return;const max=30;if(sp>max){vx*=max/sp;vy*=max/sp;}
+    Body.setStatic(this.ball,false);Body.setVelocity(this.ball,{x:vx*0.7,y:vy*0.7});Body.setAngularVelocity(this.ball,vx*0.01);
+    this.flying=true;this.flick=null;},
+
+  end(){if(this.over)return;this.over=true;if(this.score>this.best){this.best=this.score;localStorage.setItem('hoops-best',this.best);}
+    document.getElementById('finalScore').textContent=this.score;
+    let v,b;
+    if(this.score>=15){v='Snack Curry!';b='Raff is a sharpshooter. Every snack sunk like destiny.';}
+    else if(this.score>=8){v='On Fire!';b='A serious hot streak. The bowl never stood a chance.';}
+    else if(this.score>=3){v='Swish!';b='Some clean buckets. Raff celebrates by eating the evidence.';}
+    else{v='Bricked It';b='The bowl remains hungry. Raff blames the rim.';}
+    document.getElementById('verdict').textContent=v;document.getElementById('blurb').textContent=`${b} (best ${this.best})`;
+    document.getElementById('over').classList.add('show');}
+};
+addEventListener('pointerdown',e=>Game.begin(e.clientX,e.clientY));
+addEventListener('pointermove',e=>Game.move(e.clientX,e.clientY));
+addEventListener('pointerup',e=>Game.release());
+addEventListener('pointercancel',e=>Game.release());
+document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+Game.draw();
+</script>
+</body>
+</html>

@@ -145,11 +145,17 @@ const Game={
     const {body,wA,wB}=this; if(!body)return;
     if(!this.dead&&!this.won){
       if(this.held&&this.fuel>0){
-        const target=0.62; // controlled wheel speed
-        wA.angularVelocity=Math.min(wA.angularVelocity+0.05,target);
-        wB.angularVelocity=Math.min(wB.angularVelocity+0.05,target);
-        this.fuel=Math.max(0,this.fuel-0.0016);
+        // setAngularVelocity actually sticks; direct assignment gets overwritten by the engine
+        this.spin=Math.min((this.spin||0)+0.05,0.62);
+        Body.setAngularVelocity(wA,this.spin);
+        Body.setAngularVelocity(wB,this.spin);
+        // direct forward push guarantees motion regardless of traction
+        Body.applyForce(body,body.position,{x:0.0024*body.mass,y:0});
+        this.fuel=Math.max(0,this.fuel-0.0015);
         if(Math.random()<0.5)this.smoke(wB);
+      }else{
+        this.spin=(this.spin||0)*0.93;
+        if(this.spin>0.03){Body.setAngularVelocity(wA,this.spin);Body.setAngularVelocity(wB,this.spin);}
       }
       document.getElementById('fuelbar').style.width=(this.fuel*100)+'%';
       // gentle air-righting so casual flips self-correct (forgiving)
