@@ -7,26 +7,25 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#fa709a;--accent2:#fee140;--text:#f0ede6;--muted:#666}
+  :root{--accent:#fa709a;--accent2:#fee140;--muted:#888}
   *,*::before,*::after{box-sizing:border-box;margin:0}
-  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
-  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:rgba(17,17,17,.7);transition:all .15s;z-index:20}
+  html,body{background:#0a0a0a;color:#f0ede6;font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(255,255,255,.15);border-radius:100px;color:#fff;text-decoration:none;font-size:13px;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);transition:all .15s;z-index:20}
   .back-btn:hover{color:var(--accent);border-color:var(--accent)}
-  #stage{position:fixed;inset:0;z-index:1}
-  #stage canvas{display:block;width:100%;height:100%}
+  #c{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:1}
   .hud{position:fixed;top:16px;left:0;right:0;text-align:center;z-index:5;pointer-events:none}
-  .hud .t{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.06em;color:var(--muted)}
+  .hud .t{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.1em;color:rgba(255,255,255,.7)}
   .hud .t .r{color:var(--accent)}
-  .hud .d{font-family:'Bebas Neue',sans-serif;font-size:46px;line-height:1;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.7)}
-  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(5,5,5,.84);backdrop-filter:blur(3px);padding:24px}
+  .hud .d{font-family:'Bebas Neue',sans-serif;font-size:52px;line-height:.9;color:#fff;text-shadow:0 3px 12px rgba(0,0,0,.7)}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(10,6,9,.85);backdrop-filter:blur(4px);padding:24px}
   .overlay.show{display:flex}
   .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
-  .overlay p{color:var(--muted);font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
+  .overlay p{color:#bbb;font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
   .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
   .big{font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--accent2);line-height:1}
-  .btn{padding:15px 46px;background:var(--accent);color:#fff;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s}
+  .btn{padding:15px 46px;background:linear-gradient(135deg,var(--accent),#d6537a);color:#fff;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s;box-shadow:0 8px 20px rgba(250,112,154,.3)}
   .btn:active{transform:scale(.95)}
-  .hint{font-size:14px;color:var(--muted);letter-spacing:.08em}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.06em}
 </style>
 </head>
 <body>
@@ -34,7 +33,7 @@
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
   Raff.fun
 </a>
-<div id="stage"></div>
+<canvas id="c"></canvas>
 <div class="hud">
   <div class="t">Snack <span class="r">Tower</span></div>
   <div class="d" id="score">0</div>
@@ -57,142 +56,124 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <script>
-const {Engine,Render,Runner,Bodies,Body,Composite,Events,Vector}=Matter;
+const {Engine,Bodies,Body,Composite,Vector}=Matter;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;}
+addEventListener('resize',resize);resize();
 const SNACKS=['🍔','🍩','🍕','🧁','🍪','🌮','🥪','🍰','🥨','🍞'];
+const COLORS=['#fa709a','#ffb86c','#ff9d3a','#f15bb5','#fda4af','#fbbf24'];
 
 const Game={
-  start(){
-    document.getElementById('start').classList.remove('show');
-    document.getElementById('over').classList.remove('show');
-    this.build();
-  },
+  best:+(localStorage.getItem('tower-best')||0),
+  start(){document.getElementById('start').classList.remove('show');document.getElementById('over').classList.remove('show');
+    this.build();if(!this.loopOn){this.loopOn=true;requestAnimationFrame(()=>this.frame());}},
 
   build(){
-    if(this.render){Render.stop(this.render);this.render.canvas.remove();}
-    if(this.runner)Runner.stop(this.runner);
-    if(this.engine)Engine.clear(this.engine);
-
-    const W=window.innerWidth,H=window.innerHeight;this.W=W;this.H=H;
     const engine=Engine.create();engine.gravity.y=1.0;this.engine=engine;
-    const render=Render.create({element:document.getElementById('stage'),engine,
-      options:{width:W,height:H,wireframes:false,background:'#120a10',pixelRatio:1,hasBounds:true}});
-    this.render=render;
-
-    const platY=H*0.82;this.platY=platY;
-    this.plat=Bodies.rectangle(W/2,platY+24,Math.min(W*0.5,200),48,{isStatic:true,chamfer:{radius:8},
-      render:{fillStyle:'#2a2a2a'}});
+    this.snacks=[];this.particles=[];this.score=0;this.over=false;this.dropped=false;this.settleT=0;
+    this.dir=1;this.speed=2.6;this.t=0;this.camY=0;
+    const platY=H*0.82;this.platY=platY;this.topY=platY;
+    this.plat=Bodies.rectangle(W/2,platY+26,Math.min(W*0.5,210),52,{isStatic:true,friction:1,chamfer:{radius:8}});
     Composite.add(engine.world,this.plat);
-
-    this.snacks=[];this.score=0;this.dropY=platY-220;this.dir=1;this.speed=2.4;
-    this.current=null;this.dropped=false;this.settleT=0;this.topY=platY;this.over=false;
-    document.getElementById('score').textContent=0;
     this.spawn();
-
-    Events.on(engine,'beforeUpdate',()=>this.tick());
-    Events.on(render,'afterRender',()=>this.afterRender());
-    const runner=Runner.create();this.runner=runner;Runner.run(runner,engine);Render.run(render);
+    document.getElementById('score').textContent=0;
   },
 
-  spawn(){
-    const W=this.W;
-    const bw=44+Math.random()*22, bh=30;
-    const y=this.topY-150;
-    const s=Bodies.rectangle(W*0.5,y,bw,bh,{density:0.001,friction:0.7,frictionStatic:1,
-      chamfer:{radius:6},render:{fillStyle:'#fa709a'}});
-    s.emoji=SNACKS[Math.floor(Math.random()*SNACKS.length)];
-    Body.setStatic(s,true);
-    Composite.add(this.engine.world,s);
-    this.current=s;this.dropped=false;this.settleT=0;
-    this.dropY=y;this.cx=W*0.5;this.dir=Math.random()<.5?1:-1;
-    this.range=Math.min(W*0.34,200);
-  },
+  spawn(){const bw=46+Math.random()*22,bh=32;const y=this.topY-160;
+    const s=Bodies.rectangle(W*0.5,y,bw,bh,{density:.001,friction:.85,frictionStatic:1,chamfer:{radius:7}});
+    s.emoji=SNACKS[(Math.random()*SNACKS.length)|0];s.col=COLORS[(Math.random()*COLORS.length)|0];s.w=bw;s.h=bh;
+    Body.setStatic(s,true);Composite.add(this.engine.world,s);
+    this.current=s;this.dropped=false;this.settleT=0;this.cx=W*0.5;this.dropY=y;this.dir=Math.random()<.5?1:-1;
+    this.range=Math.min(W*0.33,200);},
 
-  drop(){
-    if(this.over||!this.current||this.dropped)return;
-    Body.setStatic(this.current,false);
-    Body.setVelocity(this.current,{x:0,y:6});
-    this.dropped=true;this.settleT=0;
-  },
+  drop(){if(this.over||!this.current||this.dropped)return;Body.setStatic(this.current,false);
+    Body.setVelocity(this.current,{x:0,y:7});this.dropped=true;this.settleT=0;},
 
-  tick(){
-    if(this.over)return;
+  frame(){requestAnimationFrame(()=>this.frame());this.t++;
+    if(this.engine&&!this.over)this.step();if(this.engine)Engine.update(this.engine,1000/60);this.draw();},
+
+  step(){
     const cur=this.current;
-    if(cur&&!this.dropped){
-      // slide horizontally
-      this.cx+=this.dir*this.speed;
-      const W=this.W;
+    if(cur&&!this.dropped){this.cx+=this.dir*this.speed;
       if(this.cx>W*0.5+this.range){this.cx=W*0.5+this.range;this.dir=-1;}
       if(this.cx<W*0.5-this.range){this.cx=W*0.5-this.range;this.dir=1;}
       Body.setPosition(cur,{x:this.cx,y:this.dropY});
-    } else if(cur&&this.dropped){
+    }else if(cur&&this.dropped){
       const v=Vector.magnitude(cur.velocity);
-      if(v<0.5&&cur.position.y<this.platY+10){this.settleT++;}else{this.settleT=0;}
-      // landed off the tower / on floor -> game over check after settle
-      if(this.settleT>22){
-        this.place();
-      }
-      // fell past platform = topple
-      if(cur.position.y>this.platY+120){this.fail();}
+      this.settleT=(v<0.5&&cur.position.y<this.platY+10)?this.settleT+1:0;
+      if(this.settleT>20)this.place();
+      if(cur.position.y>this.platY+130)this.fail();
     }
-    // any earlier snack falls off -> topple
-    for(const s of this.snacks){
-      if(s.position.y>this.platY+140){this.fail();return;}
-    }
+    for(const s of this.snacks){if(s.position.y>this.platY+150){this.fail();break;}}
+    // camera eases to keep top in view
+    const target=Math.min(0,(this.topY-160)-(this.platY-H*0.78));
+    this.camY+=(target-this.camY)*0.08;
+    for(const p of this.particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.25;p.life--;}
+    this.particles=this.particles.filter(p=>p.life>0);
   },
 
-  place(){
-    const cur=this.current;
-    this.snacks.push(cur);
-    this.score++;
+  place(){const cur=this.current;this.snacks.push(cur);this.score++;
     document.getElementById('score').textContent=this.score;
-    this.topY=Math.min(this.topY,cur.bounds.min.y);
-    this.speed=Math.min(2.4+this.score*0.12,7);
-    this.current=null;
-    setTimeout(()=>{if(!this.over)this.spawn();},120);
-  },
+    this.topY=Math.min(this.topY,cur.bounds.min.y);this.speed=Math.min(2.6+this.score*0.12,7);
+    for(let i=0;i<8;i++)this.particles.push({x:cur.position.x+(Math.random()-.5)*cur.w,y:cur.bounds.max.y,vx:(Math.random()-.5)*2,vy:-Math.random()*2,life:18,r:2+Math.random()*2,c:'255,255,255'});
+    this.current=null;setTimeout(()=>{if(!this.over)this.spawn();},110);},
 
-  afterRender(){
-    // camera: keep top of tower in view
-    const r=this.render;
-    const focusY=Math.min(this.platY-60, this.topY+120);
-    r.bounds.min.x=0;r.bounds.max.x=this.W;
-    let top=Math.min(this.platY, this.topY-200);
-    r.bounds.min.y=top; r.bounds.max.y=top+this.H;
-    // keep platform near bottom if tower short
-    if(this.platY - top < this.H*0.7){ r.bounds.min.y=this.platY-this.H*0.78; r.bounds.max.y=r.bounds.min.y+this.H; }
-    const ctx=r.context;
-    const w2s=(wx,wy)=>({x:(wx-r.bounds.min.x)*(this.W/(r.bounds.max.x-r.bounds.min.x)),
-                         y:(wy-r.bounds.min.y)*(this.H/(r.bounds.max.y-r.bounds.min.y))});
-    ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
+  draw(){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#1a1030');sky.addColorStop(.5,'#2a1838');sky.addColorStop(1,'#3a2030');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    // stars
+    ctx.fillStyle='rgba(255,255,255,.5)';for(let i=0;i<40;i++){const x=(i*97)%W,y=(i*53)%(H*0.6);ctx.globalAlpha=0.3+0.5*Math.abs(Math.sin(i+this.t*0.01));ctx.fillRect(x,y,2,2);}ctx.globalAlpha=1;
+    ctx.save();ctx.translate(0,-this.camY);
+    // platform
+    const p=this.plat;ctx.save();ctx.translate(p.position.x,p.position.y);
+    const pg=ctx.createLinearGradient(0,-26,0,26);pg.addColorStop(0,'#3a3a44');pg.addColorStop(1,'#1a1a22');
+    ctx.fillStyle=pg;roundRect(-Math.min(W*0.25,105),-26,Math.min(W*0.5,210),52,8);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.08)';ctx.fillRect(-Math.min(W*0.25,105),-26,Math.min(W*0.5,210),4);ctx.restore();
+    // snacks
     const all=this.current?this.snacks.concat([this.current]):this.snacks;
-    for(const s of all){
-      const p=w2s(s.position.x,s.position.y);
-      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(s.angle);
-      ctx.font=(Math.min(s.bounds.max.x-s.bounds.min.x,40))+'px serif';
-      ctx.fillText(s.emoji,0,1);ctx.restore();
-    }
+    for(const s of all)this.snack(s);
+    // particles
+    for(const pt of this.particles){ctx.fillStyle='rgba('+pt.c+','+(pt.life/18)+')';ctx.beginPath();ctx.arc(pt.x,pt.y,pt.r,0,6.3);ctx.fill();}
+    // guide line for current
+    if(this.current&&!this.dropped){ctx.strokeStyle='rgba(255,255,255,.18)';ctx.setLineDash([5,7]);ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(this.cx,this.dropY+20);ctx.lineTo(this.cx,this.topY);ctx.stroke();ctx.setLineDash([]);}
     ctx.restore();
   },
 
-  fail(){
-    if(this.over)return;this.over=true;
+  snack(s){ctx.save();ctx.translate(s.position.x,s.position.y);ctx.rotate(s.angle);
+    const g=ctx.createLinearGradient(0,-s.h/2,0,s.h/2);g.addColorStop(0,s.col);g.addColorStop(1,shade(s.col,-30));
+    ctx.fillStyle=g;ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=2;
+    roundRect(-s.w/2,-s.h/2,s.w,s.h,7);ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(-s.w/2+4,-s.h/2+3,s.w-8,4);
+    ctx.font=Math.min(s.h*0.8,26)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(s.emoji,0,1);
+    ctx.restore();},
+
+  fail(){if(this.over)return;this.over=true;
+    if(this.score>this.best){this.best=this.score;localStorage.setItem('tower-best',this.best);}
+    // confetti collapse
+    for(const s of this.snacks)for(let i=0;i<3;i++)this.particles.push({x:s.position.x,y:s.position.y,vx:(Math.random()-.5)*6,vy:-Math.random()*5,life:30,r:3,c:'250,112,154'});
     document.getElementById('finalScore').textContent=this.score;
     let v,b;
     if(this.score>=20){v='Snack Babel!';b='A tower so tall it has its own weather. Raff is legend.';}
     else if(this.score>=12){v='Towering!';b='Serious altitude. Engineers want to study it.';}
-    else if(this.score>=6){v='Respectable';b='A solid snack stack before gravity filed a complaint.';}
+    else if(this.score>=6){v='Respectable';b='A solid stack before gravity filed its complaint.';}
     else if(this.score>=2){v='Timber!';b='It stood briefly. Raff ate the wreckage. No evidence remains.';}
-    else {v='Instant Collapse';b='Down on the first wobble. Raff calls this "a snack platter".';}
+    else{v='Instant Collapse';b='Down on the first wobble. Raff calls this "a snack platter".';}
     document.getElementById('verdict').textContent=v;
-    document.getElementById('blurb').textContent=b;
-    setTimeout(()=>document.getElementById('over').classList.add('show'),650);
-  }
+    document.getElementById('blurb').textContent=`${b} (best ${this.best})`;
+    setTimeout(()=>document.getElementById('over').classList.add('show'),700);}
 };
 
+function shade(hex,amt){const n=parseInt(hex.slice(1),16);let r=(n>>16)+amt,g=((n>>8)&255)+amt,b=(n&255)+amt;
+  r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
+  return'#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function drop(e){if(e.type==='keydown'&&e.code!=='Space')return;if(e.cancelable)e.preventDefault();Game.drop();}
-window.addEventListener('pointerdown',drop);
-window.addEventListener('keydown',drop);
+addEventListener('pointerdown',drop);addEventListener('keydown',drop);
 document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+Game.draw();
 </script>
 </body>
 </html>
