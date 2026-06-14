@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Toast Flip — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--accent:#f7971e;--accent2:#ffd200;--muted:#888}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:#0a0a0a;color:#f0ede6;font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(255,255,255,.15);border-radius:100px;color:#fff;text-decoration:none;font-size:13px;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  #c{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:1}
+  .hud{position:fixed;top:16px;left:0;right:0;display:flex;justify-content:center;gap:30px;z-index:5;pointer-events:none;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+  .hud b{color:var(--accent2);font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.04em}
+  .hud .lives{color:#ff8a4a;font-size:20px}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(10,8,4,.85);backdrop-filter:blur(4px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:#bbb;font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--accent2);line-height:1}
+  .btn{padding:15px 46px;background:linear-gradient(135deg,var(--accent),#d67a10);color:#3a2400;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s;box-shadow:0 8px 20px rgba(247,151,30,.3)}
+  .btn:active{transform:scale(.95)}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<canvas id="c"></canvas>
+<div class="hud">
+  <span>Streak <b id="score">0</b></span>
+  <span>Best <b id="best">0</b></span>
+  <span class="lives" id="lives">❤️❤️❤️</span>
+</div>
+
+<div class="overlay show" id="start">
+  <h1>Toast <span style="color:var(--accent)">Flip</span></h1>
+  <p>Raff demands his toast butter-side-up, always. <b>Flick</b> the toast to send it spinning — land it on the plate with the butter facing the sky. Miss three times and breakfast is ruined.</p>
+  <button class="btn" onclick="Game.start()">Flip</button>
+  <div class="hint">flick up &amp; release · spin = flick speed</div>
+</div>
+<div class="overlay" id="over">
+  <div class="lbl">Best streak</div>
+  <div class="big" id="finalScore">0</div>
+  <h1 id="verdict">Ruined!</h1>
+  <p id="blurb"></p>
+  <button class="btn" onclick="Game.start()">Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Bodies,Body,Composite,Vector}=Matter;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;}
+addEventListener('resize',resize);resize();
+let best=+(localStorage.getItem('toast-best')||0);document.getElementById('best').textContent=best;
+
+const Game={
+  start(){document.getElementById('start').classList.remove('show');document.getElementById('over').classList.remove('show');
+    this.score=0;this.lives=3;document.getElementById('score').textContent=0;document.getElementById('lives').textContent='❤️❤️❤️';
+    this.build();if(!this.loopOn){this.loopOn=true;requestAnimationFrame(()=>this.frame());}},
+
+  build(){
+    const engine=Engine.create();engine.gravity.y=1.1;this.engine=engine;
+    this.particles=[];this.flying=false;this.dragging=false;this.result=null;this.over=false;this.t=0;this.track=[];
+    this.plateY=H*0.8;this.plateX=W*0.5;this.plateW=Math.min(W*0.5,220);
+    // floor (catch) far below plate level
+    this.floorY=H+200;
+    this.spawnToast();
+  },
+
+  spawnToast(){
+    this.startX=W*0.5;this.startY=H*0.62;
+    const t=Bodies.rectangle(this.startX,this.startY,64,42,{density:.001,friction:.6,frictionAir:.006,restitution:.15,chamfer:{radius:8}});
+    if(this.toast)Composite.remove(this.engine.world,this.toast);
+    this.toast=t;Body.setStatic(t,true);Composite.add(this.engine.world,t);
+    this.flying=false;this.result=null;this.settleT=0;
+  },
+
+  frame(){requestAnimationFrame(()=>this.frame());this.t++;
+    if(this.engine&&!this.over){this.step();Engine.update(this.engine,1000/60);}this.draw();},
+
+  step(){
+    const t=this.toast;if(!t)return;
+    if(this.flying&&!this.result){
+      const v=Vector.magnitude(t.velocity);
+      // landed on/near plate?
+      if(v<0.6&&Math.abs(t.angularVelocity)<0.05&&t.position.y>this.plateY-60){this.judge();}
+      // fell past plate sides
+      if(t.position.y>H+120)this.miss('floor');
+    }
+    for(const p of this.particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.2;p.life--;}this.particles=this.particles.filter(p=>p.life>0);
+  },
+
+  judge(){
+    const t=this.toast;const onPlate=Math.abs(t.position.x-this.plateX)<this.plateW/2-6 && t.position.y<this.plateY+10;
+    let a=t.angle%(2*Math.PI);if(a>Math.PI)a-=2*Math.PI;if(a<-Math.PI)a+=2*Math.PI;
+    const butterUp=Math.abs(a)<0.6;
+    if(onPlate&&butterUp){this.hit();}else{this.miss(onPlate?'butter':'plate');}
+  },
+
+  hit(){this.result='hit';this.score++;document.getElementById('score').textContent=this.score;
+    const t=this.toast.position;for(let i=0;i<18;i++){const an=Math.random()*6.28,s=2+Math.random()*4;this.particles.push({x:t.x,y:t.y,vx:Math.cos(an)*s,vy:Math.sin(an)*s-2,life:30,r:3,c:'255,210,0'});}
+    setTimeout(()=>{if(!this.over)this.spawnToast();},650);},
+
+  miss(kind){if(this.result)return;this.result='miss';this.lives--;
+    document.getElementById('lives').textContent='❤️'.repeat(Math.max(0,this.lives))+'🖤'.repeat(3-Math.max(0,this.lives));
+    this.lastMiss=kind;
+    if(this.lives<=0){setTimeout(()=>this.end(),700);}else setTimeout(()=>{if(!this.over)this.spawnToast();},750);},
+
+  draw(){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#2a2008');sky.addColorStop(.5,'#3a2c12');sky.addColorStop(1,'#1c1408');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    const sg=ctx.createRadialGradient(W*0.5,H*0.25,10,W*0.5,H*0.25,260);sg.addColorStop(0,'rgba(255,210,0,.18)');sg.addColorStop(1,'rgba(255,210,0,0)');ctx.fillStyle=sg;ctx.fillRect(0,0,W,H);
+    // table
+    ctx.fillStyle='#3a2614';ctx.fillRect(0,this.plateY+18,W,H);
+    ctx.fillStyle='rgba(255,255,255,.05)';ctx.fillRect(0,this.plateY+18,W,4);
+    // plate
+    ctx.save();ctx.translate(this.plateX,this.plateY+16);
+    ctx.fillStyle='#d8dde2';ctx.beginPath();ctx.ellipse(0,0,this.plateW/2,16,0,0,6.3);ctx.fill();
+    ctx.fillStyle='#eef2f5';ctx.beginPath();ctx.ellipse(0,-3,this.plateW/2-12,11,0,0,6.3);ctx.fill();
+    ctx.restore();
+    // toast
+    this.drawToast();
+    // particles
+    for(const p of this.particles){ctx.fillStyle='rgba('+(p.c||'255,210,0')+','+(p.life/30)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.3);ctx.fill();}
+    // flick guide
+    if(this.dragging&&this.flick){const t=this.toast.position;ctx.strokeStyle='rgba(247,151,30,.9)';ctx.lineWidth=4;ctx.setLineDash([6,6]);
+      ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x+this.flick.x*0.4,t.y+this.flick.y*0.4);ctx.stroke();ctx.setLineDash([]);}
+    if(!this.flying&&!this.dragging&&!this.over){ctx.fillStyle='rgba(255,210,0,'+(0.4+0.3*Math.sin(this.t*0.1))+')';ctx.font='14px DM Sans';ctx.textAlign='center';ctx.fillText('flick up to flip ↑',this.startX,this.startY-46);}
+  },
+
+  drawToast(){const t=this.toast;if(!t)return;ctx.save();ctx.translate(t.position.x,t.position.y);ctx.rotate(t.angle);
+    // bread
+    const g=ctx.createLinearGradient(0,-21,0,21);g.addColorStop(0,'#e6a94a');g.addColorStop(1,'#c4842e');
+    ctx.fillStyle=g;roundRect(-32,-21,64,42,9);ctx.fill();
+    ctx.strokeStyle='#a86a22';ctx.lineWidth=2;ctx.stroke();
+    // butter side (top)
+    ctx.fillStyle='#ffe98a';roundRect(-24,-17,48,12,5);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.5)';roundRect(-20,-16,18,4,2);ctx.fill();
+    ctx.restore();},
+
+  // flick input
+  begin(sx,sy){if(this.flying||this.over)return;this.dragging=true;this.track=[{x:sx,y:sy,t:performance.now()}];this.flick=null;},
+  move(sx,sy){if(!this.dragging)return;this.track.push({x:sx,y:sy,t:performance.now()});if(this.track.length>6)this.track.shift();
+    const a=this.track[0],b=this.track[this.track.length-1];this.flick={x:b.x-a.x,y:b.y-a.y};},
+  release(){if(!this.dragging)return;this.dragging=false;if(this.flying)return;
+    const tr=this.track;if(tr.length<2){return;}
+    const a=tr[0],b=tr[tr.length-1];const dt=Math.max(16,b.t-a.t);
+    let vx=(b.x-a.x)/dt*16, vy=(b.y-a.y)/dt*16;
+    const speed=Math.hypot(vx,vy);
+    if(speed<4||vy>-2){return;} // need an upward flick
+    // clamp
+    const max=26;if(speed>max){vx*=max/speed;vy*=max/speed;}
+    Body.setStatic(this.toast,false);
+    Body.setVelocity(this.toast,{x:vx*0.5,y:Math.max(vy*0.7,-22)});
+    Body.setAngularVelocity(this.toast,(vx*0.012)+ (Math.sign(vx||1))*0.32);
+    this.flying=true;this.flick=null;},
+
+  end(){if(this.over)return;this.over=true;if(this.score>best){best=this.score;localStorage.setItem('toast-best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('finalScore').textContent=this.score;
+    let v,b;
+    if(this.score>=15){v='Toast Master!';b='Butter-side-up every time. Raff weeps with joy into his plate.';}
+    else if(this.score>=8){v='Buttered Up!';b='A serious flipping streak. Breakfast is elite.';}
+    else if(this.score>=3){v='Not Bad!';b='A few clean landings. Raff nods, mouth full.';}
+    else{v='Ruined!';b='Butter met floor. Raff considers this a personal tragedy.';}
+    document.getElementById('verdict').textContent=v;document.getElementById('blurb').textContent=`${b} (best ${best})`;
+    document.getElementById('over').classList.add('show');}
+};
+addEventListener('pointerdown',e=>Game.begin(e.clientX,e.clientY));
+addEventListener('pointermove',e=>Game.move(e.clientX,e.clientY));
+addEventListener('pointerup',e=>Game.release());
+addEventListener('pointercancel',e=>Game.release());
+document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+Game.draw();
+</script>
+</body>
+</html>
