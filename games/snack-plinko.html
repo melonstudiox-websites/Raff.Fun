@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snack Plinko — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--accent:#00c9ff;--accent2:#92fe9d;--muted:#888}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:#0a0a0a;color:#f0ede6;font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(255,255,255,.15);border-radius:100px;color:#fff;text-decoration:none;font-size:13px;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  #c{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:1}
+  .hud{position:fixed;top:16px;left:0;right:0;display:flex;justify-content:center;gap:30px;z-index:5;pointer-events:none;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+  .hud b{color:var(--accent2);font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.04em}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(4,8,10,.85);backdrop-filter:blur(4px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:#bbb;font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--accent2);line-height:1}
+  .btn{padding:15px 46px;background:linear-gradient(135deg,var(--accent),#0090c0);color:#022;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s;box-shadow:0 8px 20px rgba(0,201,255,.3)}
+  .btn:active{transform:scale(.95)}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<canvas id="c"></canvas>
+<div class="hud">
+  <span>Score <b id="score">0</b></span>
+  <span>Drops <b id="drops">10</b></span>
+</div>
+
+<div class="overlay show" id="start">
+  <h1>Snack <span style="color:var(--accent)">Plinko</span></h1>
+  <p>Raff's snacks must find their way home. <b>Tap the top</b> to drop a snack — it pings through the pegs into a bin. Big bins = big points. Avoid the veggie bin. You get 10 drops!</p>
+  <button class="btn" onclick="Game.start()">Drop</button>
+  <div class="hint">tap anywhere up top to drop</div>
+</div>
+<div class="overlay" id="over">
+  <div class="lbl">Final score</div>
+  <div class="big" id="finalScore">0</div>
+  <h1 id="verdict">Snack Run!</h1>
+  <p id="blurb"></p>
+  <button class="btn" onclick="Game.start()">Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Bodies,Body,Composite,Vector}=Matter;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;}
+addEventListener('resize',resize);resize();
+const SNACKS=['🍿','🍩','🍪','🍬','🧁','🍫'];
+
+const Game={
+  best:+(localStorage.getItem('plinko-best')||0),
+  start(){document.getElementById('start').classList.remove('show');document.getElementById('over').classList.remove('show');
+    this.build();if(!this.loopOn){this.loopOn=true;requestAnimationFrame(()=>this.frame());}},
+
+  build(){
+    const engine=Engine.create();engine.gravity.y=1.1;this.engine=engine;
+    this.balls=[];this.pops=[];this.score=0;this.drops=10;this.t=0;this.over=false;this.active=0;
+    document.getElementById('score').textContent=0;document.getElementById('drops').textContent=10;
+
+    const fieldW=Math.min(W,460),x0=(W-fieldW)/2;this.x0=x0;this.fieldW=fieldW;
+    this.top=H*0.2;const bottom=H*0.74;this.bottom=bottom;
+    // bins
+    const vals=[1,2,4,0,8,0,4,2,1];this.binVals=vals;const n=vals.length;this.binW=fieldW/n;
+    // pegs (staggered)
+    this.pegs=[];const rows=8;const rowH=(bottom-this.top)/rows;
+    const bodies=[];
+    for(let r=0;r<rows;r++){
+      const cols=n+ (r%2?0:1);
+      const off=(r%2)?this.binW/2:0;
+      for(let cMul=0;cMul<cols;cMul++){
+        const px=x0+off+cMul*this.binW + (r%2?0:0);
+        const py=this.top+r*rowH;
+        if(px<x0+6||px>x0+fieldW-6)continue;
+        const peg=Bodies.circle(px,py,5,{isStatic:true,restitution:.5,friction:0});
+        this.pegs.push({x:px,y:py});bodies.push(peg);
+      }
+    }
+    // bin dividers + floor
+    for(let i=0;i<=n;i++){const dx=x0+i*this.binW;
+      bodies.push(Bodies.rectangle(dx,bottom+38,4,80,{isStatic:true,friction:.2}));}
+    bodies.push(Bodies.rectangle(W/2,bottom+80,W,12,{isStatic:true}));
+    // walls
+    bodies.push(Bodies.rectangle(x0-6,H/2,12,H*2,{isStatic:true}));
+    bodies.push(Bodies.rectangle(x0+fieldW+6,H/2,12,H*2,{isStatic:true}));
+    Composite.add(engine.world,bodies);
+    this.binFloorY=bottom+38;
+  },
+
+  drop(sx){
+    if(this.over||this.drops<=0||this.active>0)return;
+    const x=Math.max(this.x0+14,Math.min(this.x0+this.fieldW-14,sx));
+    const b=Bodies.circle(x,this.top-30,11,{restitution:.45,friction:.005,density:.002});
+    b.emoji=SNACKS[(Math.random()*SNACKS.length)|0];b.scored=false;
+    Composite.add(this.engine.world,b);this.balls.push(b);this.active++;
+    this.drops--;document.getElementById('drops').textContent=this.drops;
+  },
+
+  frame(){requestAnimationFrame(()=>this.frame());this.t++;
+    if(this.engine&&!this.over)this.step();if(this.engine)Engine.update(this.engine,1000/60);this.draw();},
+
+  step(){
+    for(const b of this.balls){
+      if(!b.scored&&b.position.y>this.binFloorY-2&&Vector.magnitude(b.velocity)<1.2){
+        b.scored=true;this.active=Math.max(0,this.active-1);
+        const idx=Math.max(0,Math.min(this.binVals.length-1,Math.floor((b.position.x-this.x0)/this.binW)));
+        const val=this.binVals[idx];this.score+=val;document.getElementById('score').textContent=this.score;
+        this.pops.push({x:b.position.x,y:b.position.y-20,txt:val?'+'+val:'veggie!',c:val?'#92fe9d':'#ff5c5c',life:40});
+        setTimeout(()=>{Composite.remove(this.engine.world,b);this.balls=this.balls.filter(x=>x!==b);},400);
+        if(this.drops<=0&&this.active<=0)setTimeout(()=>this.end(),500);
+      }
+    }
+    for(const p of this.pops){p.y-=0.6;p.life--;}this.pops=this.pops.filter(p=>p.life>0);
+  },
+
+  draw(){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#04222b');sky.addColorStop(1,'#06121a');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    // frame
+    ctx.fillStyle='rgba(255,255,255,.03)';roundRect(this.x0-6,this.top-44,this.fieldW+12,this.bottom-this.top+130,14);ctx.fill();
+    // pegs
+    for(const p of this.pegs){const g=ctx.createRadialGradient(p.x-2,p.y-2,1,p.x,p.y,6);g.addColorStop(0,'#bfefff');g.addColorStop(1,'#3a8aa6');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,5,0,6.3);ctx.fill();}
+    // bins
+    for(let i=0;i<this.binVals.length;i++){const bx=this.x0+i*this.binW,v=this.binVals[i];
+      ctx.fillStyle=v?`rgba(0,201,255,${0.10+v*0.03})`:'rgba(255,92,92,.16)';
+      ctx.fillRect(bx+3,this.bottom+2,this.binW-6,76);
+      ctx.fillStyle=v?'#92fe9d':'#ff8a8a';ctx.font='bold 16px DM Sans';ctx.textAlign='center';
+      ctx.fillText(v?('×'+v):'🥦',bx+this.binW/2,this.bottom+44);}
+    // dividers
+    ctx.fillStyle='rgba(255,255,255,.25)';for(let i=0;i<=this.binVals.length;i++){ctx.fillRect(this.x0+i*this.binW-1,this.bottom,2,76);}
+    // balls
+    for(const b of this.balls){ctx.save();ctx.translate(b.position.x,b.position.y);ctx.rotate(b.angle);
+      ctx.fillStyle='#fff2c4';ctx.beginPath();ctx.arc(0,0,11,0,6.3);ctx.fill();
+      ctx.font='16px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(b.emoji,0,1);ctx.restore();}
+    // pops
+    for(const p of this.pops){ctx.fillStyle=p.c;ctx.globalAlpha=p.life/40;ctx.font='bold 20px Bebas Neue';ctx.textAlign='center';ctx.fillText(p.txt,p.x,p.y);ctx.globalAlpha=1;}
+    // drop indicator
+    if(!this.over&&this.drops>0&&this.active===0){ctx.fillStyle='rgba(146,254,157,'+(0.4+0.3*Math.sin(this.t*0.1))+')';
+      ctx.font='14px DM Sans';ctx.textAlign='center';ctx.fillText('▼ tap to drop ▼',W/2,this.top-50);}
+  },
+
+  end(){if(this.over)return;this.over=true;if(this.score>this.best){this.best=this.score;localStorage.setItem('plinko-best',this.best);}
+    document.getElementById('finalScore').textContent=this.score;
+    let v,b;
+    if(this.score>=40){v='Jackpot!';b='Raff is buried in snacks and could not be happier.';}
+    else if(this.score>=24){v='Big Haul!';b='The bins were kind. The veggies were avoided. A good day.';}
+    else if(this.score>=12){v='Snack Run!';b='A respectable pile. Raff approves between bites.';}
+    else{v='Rough Drops';b='The pegs were cruel and a veggie or two snuck in. Tragic.';}
+    document.getElementById('verdict').textContent=v;document.getElementById('blurb').textContent=`${b} (best ${this.best})`;
+    setTimeout(()=>document.getElementById('over').classList.add('show'),500);}
+};
+addEventListener('pointerdown',e=>Game.drop(e.clientX));
+document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+Game.draw();
+</script>
+</body>
+</html>

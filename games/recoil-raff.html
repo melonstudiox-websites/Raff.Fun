@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Recoil Raff — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--accent:#a18cd1;--accent2:#fbc2eb;--muted:#888}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:#0a0a0a;color:#f0ede6;font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(255,255,255,.15);border-radius:100px;color:#fff;text-decoration:none;font-size:13px;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  #c{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:1}
+  .hud{position:fixed;top:16px;left:0;right:0;display:flex;justify-content:center;gap:30px;z-index:5;pointer-events:none;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+  .hud b{color:var(--accent2);font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.04em}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(8,6,12,.85);backdrop-filter:blur(4px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:#bbb;font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--accent2);line-height:1}
+  .btn{padding:15px 46px;background:linear-gradient(135deg,var(--accent),#7d68b8);color:#fff;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s;box-shadow:0 8px 20px rgba(161,140,209,.3)}
+  .btn:active{transform:scale(.95)}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<canvas id="c"></canvas>
+<div class="hud">
+  <span>Hole <b id="hole">1</b></span>
+  <span>Shots <b id="shots">0</b></span>
+</div>
+
+<div class="overlay show" id="start">
+  <h1>Recoil <span style="color:var(--accent)">Raff</span></h1>
+  <p>Raff has no legs today, only a snack cannon. <b>Drag</b> to aim where you want to go and <b>release</b> — the recoil blasts him there. Reach the alarm clock in as few shots as you can!</p>
+  <button class="btn" onclick="Game.start()">Fire</button>
+  <div class="hint">drag &amp; release · recoil sends him the way you pull</div>
+</div>
+<div class="overlay" id="over">
+  <div class="lbl">Total shots over 3 holes</div>
+  <div class="big" id="finalScore">0</div>
+  <h1 id="verdict">Sunk It!</h1>
+  <p id="blurb"></p>
+  <button class="btn" onclick="Game.start()">Play Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Bodies,Body,Composite,Vector}=Matter;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;}
+addEventListener('resize',resize);resize();
+
+const Game={
+  start(){document.getElementById('start').classList.remove('show');document.getElementById('over').classList.remove('show');
+    this.hole=1;this.totalShots=0;this.build();if(!this.loopOn){this.loopOn=true;requestAnimationFrame(()=>this.frame());}},
+
+  build(){
+    const engine=Engine.create();engine.gravity.y=1.2;this.engine=engine;
+    this.particles=[];this.tracers=[];this.shots=0;this.camX=0;this.camY=0;this.t=0;this.won=false;this.dragging=false;this.aim=null;
+    document.getElementById('hole').textContent=this.hole;document.getElementById('shots').textContent=0;
+
+    // course: bumpy ground from circle colliders + end walls
+    const base=H*0.66;this.base=base;const seed=this.hole*1.7;
+    this.pts=[];const N=170,step=24;
+    for(let i=0;i<=N;i++){const x=i*step;let y=base;
+      if(i>4&&i<N-4)y=base+Math.sin(i*0.09+seed)*36+Math.sin(i*0.21+seed)*16;
+      this.pts.push({x,y});}
+    const cols=[];for(let i=0;i<this.pts.length;i++){const p=this.pts[i];cols.push(Bodies.circle(p.x,p.y+26,30,{isStatic:true,friction:.8}));}
+    cols.push(Bodies.rectangle(this.pts[0].x-20,base-200,40,800,{isStatic:true}));
+    cols.push(Bodies.rectangle(this.pts[N].x+20,base-200,40,800,{isStatic:true}));
+    Composite.add(engine.world,cols);
+
+    const sx=this.pts[6].x,sy=this.groundYAt(sx)-30;
+    const ball=Bodies.circle(sx,sy,16,{density:.004,friction:.6,frictionStatic:1,restitution:.2,frictionAir:.012});
+    Composite.add(engine.world,ball);this.ball=ball;
+    this.targetX=this.pts[N-8].x;this.targetY=this.groundYAt(this.targetX)-18;
+    this.camX=sx;this.camY=sy;
+  },
+
+  groundYAt(x){const pts=this.pts,step=24;let i=Math.max(0,Math.min(pts.length-2,Math.floor(x/step)));
+    const a=pts[i],b=pts[i+1],t=(x-a.x)/(b.x-a.x||1);return a.y+(b.y-a.y)*t;},
+
+  frame(){requestAnimationFrame(()=>this.frame());this.t++;
+    if(this.engine&&!this.paused){this.step();Engine.update(this.engine,1000/60);}this.draw();},
+
+  step(){
+    const b=this.ball;
+    this.camX+=(b.position.x-this.camX)*0.08;this.camY+=((b.position.y-20)-this.camY)*0.07;
+    if(!this.won&&Math.hypot(b.position.x-this.targetX,b.position.y-this.targetY)<34&&Vector.magnitude(b.velocity)<1.4){this.sink();}
+    for(const p of this.particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.2;p.life--;}this.particles=this.particles.filter(p=>p.life>0);
+    for(const tr of this.tracers){tr.life--;}this.tracers=this.tracers.filter(t=>t.life>0);
+  },
+  moving(){return Vector.magnitude(this.ball.velocity)>0.8;},
+
+  draw(){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#241a3a');sky.addColorStop(.5,'#2e2348');sky.addColorStop(1,'#3a2a40');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    const sg=ctx.createRadialGradient(W*0.7,H*0.2,8,W*0.7,H*0.2,220);sg.addColorStop(0,'rgba(251,194,235,.4)');sg.addColorStop(1,'rgba(251,194,235,0)');
+    ctx.fillStyle=sg;ctx.fillRect(0,0,W,H);
+    const ox=W/2-this.camX,oy=H/2-this.camY;
+    ctx.save();ctx.translate(ox,oy);
+    // terrain
+    const left=this.camX-W/2-40,right=this.camX+W/2+40,step=24;
+    let i0=Math.max(0,Math.floor(left/step)-1),i1=Math.min(this.pts.length-1,Math.ceil(right/step)+1);
+    ctx.beginPath();ctx.moveTo(this.pts[i0].x,this.camY+H*2);ctx.lineTo(this.pts[i0].x,this.pts[i0].y);
+    for(let i=i0;i<=i1;i++)ctx.lineTo(this.pts[i].x,this.pts[i].y);
+    ctx.lineTo(this.pts[i1].x,this.camY+H*2);ctx.closePath();
+    const g=ctx.createLinearGradient(0,this.base-60,0,this.base+200);g.addColorStop(0,'#5a4a7a');g.addColorStop(1,'#241a30');ctx.fillStyle=g;ctx.fill();
+    ctx.beginPath();ctx.moveTo(this.pts[i0].x,this.pts[i0].y);for(let i=i0;i<=i1;i++)ctx.lineTo(this.pts[i].x,this.pts[i].y);
+    ctx.strokeStyle='#c9a8ff';ctx.lineWidth=5;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();
+    // target (alarm)
+    this.target();
+    // tracers
+    for(const tr of this.tracers){ctx.strokeStyle='rgba(251,194,235,'+(tr.life/10)+')';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(tr.x1,tr.y1);ctx.lineTo(tr.x2,tr.y2);ctx.stroke();}
+    // ball + raff + cannon
+    this.raffBall();
+    // particles
+    for(const p of this.particles){ctx.fillStyle='rgba(251,194,235,'+(p.life/30)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.3);ctx.fill();}
+    // aim
+    if(this.dragging&&this.aim&&!this.moving())this.aimArrow();
+    ctx.restore();
+    // distance to target hint
+  },
+
+  target(){const x=this.targetX,y=this.targetY;
+    ctx.save();ctx.translate(x,y);
+    const pulse=1+Math.sin(this.t*0.1)*0.06;ctx.scale(pulse,pulse);
+    ctx.fillStyle='rgba(251,194,235,.18)';ctx.beginPath();ctx.arc(0,0,30,0,6.3);ctx.fill();
+    ctx.fillStyle='#ff8a4a';ctx.beginPath();ctx.arc(-9,-12,5,0,6.3);ctx.arc(9,-12,5,0,6.3);ctx.fill();
+    ctx.fillStyle='#e0521c';ctx.beginPath();ctx.arc(0,0,14,0,6.3);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,9,0,6.3);ctx.fill();
+    ctx.strokeStyle='#333';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-6);ctx.moveTo(0,0);ctx.lineTo(4,2);ctx.stroke();
+    ctx.restore();},
+
+  raffBall(){const b=this.ball;ctx.save();ctx.translate(b.position.x,b.position.y);
+    // shadow
+    const gy=this.groundYAt(b.position.x);ctx.save();ctx.globalAlpha=.25;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(0,gy-b.position.y+14,18,5,0,0,6.3);ctx.fill();ctx.restore();
+    ctx.rotate(b.angle);
+    const g=ctx.createRadialGradient(-5,-5,2,0,0,16);g.addColorStop(0,'#fff2c4');g.addColorStop(1,'#d6a93a');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,16,0,6.3);ctx.fill();
+    ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(this.won?'🤩':(this.moving()?'😆':'😎'),0,1);
+    ctx.restore();
+    // cannon pointing opposite to aim
+    if(this.dragging&&this.aim&&!this.moving()){const ang=Math.atan2(this.aim.y,this.aim.x);
+      ctx.save();ctx.translate(b.position.x,b.position.y);ctx.rotate(ang+Math.PI);
+      ctx.fillStyle='#555';roundRect(0,-5,22,10,3);ctx.fill();ctx.restore();}},
+
+  aimArrow(){const b=this.ball,o=b.position;const power=Math.min(Vector.magnitude(this.aim),150);
+    const ang=Math.atan2(this.aim.y,this.aim.x);
+    const v=power*0.13,vx=Math.cos(ang)*v,vy=Math.sin(ang)*v;
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    for(let s=1;s<=12;s++){const tt=s*2.6;const px=o.x+vx*tt,py=o.y+vy*tt+0.5*1.2*tt*tt;ctx.beginPath();ctx.arc(px,py,2.5,0,6.3);ctx.fill();}
+    ctx.strokeStyle='rgba(161,140,209,.95)';ctx.lineWidth=4;ctx.setLineDash([7,7]);
+    ctx.beginPath();ctx.moveTo(o.x,o.y);ctx.lineTo(o.x+Math.cos(ang)*power,o.y+Math.sin(ang)*power);ctx.stroke();ctx.setLineDash([]);},
+
+  begin(sx,sy){if(this.won||this.moving())return;this.dragging=true;this.dragStart={sx,sy};this.aim={x:0,y:0};},
+  move(sx,sy){if(!this.dragging)return;this.aim={x:sx-this.dragStart.sx,y:sy-this.dragStart.sy};},
+  release(){if(!this.dragging)return;this.dragging=false;if(this.moving())return;
+    const power=Math.min(Vector.magnitude(this.aim||{x:0,y:0}),150);if(power<14){this.aim=null;return;}
+    const ang=Math.atan2(this.aim.y,this.aim.x),v=power*0.13;
+    Body.setVelocity(this.ball,{x:Math.cos(ang)*v,y:Math.sin(ang)*v});
+    this.shots++;this.totalShots++;document.getElementById('shots').textContent=this.shots;
+    // muzzle flash + tracer (opposite dir)
+    const b=this.ball.position;const bx=b.x-Math.cos(ang)*40,by=b.y-Math.sin(ang)*40;
+    this.tracers.push({x1:b.x,y1:b.y,x2:bx,y2:by,life:10});
+    for(let i=0;i<10;i++){const a=ang+Math.PI+(Math.random()-.5);const s=2+Math.random()*4;this.particles.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20,r:2+Math.random()*2});}
+    this.aim=null;},
+
+  sink(){if(this.won)return;this.won=true;
+    const b=this.ball.position;for(let i=0;i<24;i++){const a=Math.random()*6.28,s=2+Math.random()*5;this.particles.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:34,r:3});}
+    if(this.hole>=3){setTimeout(()=>this.end(),700);}
+    else{setTimeout(()=>{this.hole++;this.build();},800);}},
+
+  end(){document.getElementById('finalScore').textContent=this.totalShots;
+    let v,b;const s=this.totalShots;
+    if(s<=6){v='Hole in None!';b='Pinpoint recoil. Raff is a snack-cannon savant.';}
+    else if(s<=10){v='Sharpshooter!';b='Clean blasting across all three holes. Impressive aim.';}
+    else if(s<=16){v='Sunk It!';b='Got there in the end. Style points pending.';}
+    else{v='...Eventually.';b='A lot of shots, a lot of snacks fired, but Raff arrived. Mostly.';}
+    document.getElementById('verdict').textContent=v;document.getElementById('blurb').textContent=b;
+    document.getElementById('over').classList.add('show');}
+};
+addEventListener('pointerdown',e=>Game.begin(e.clientX,e.clientY));
+addEventListener('pointermove',e=>Game.move(e.clientX,e.clientY));
+addEventListener('pointerup',e=>Game.release());
+addEventListener('pointercancel',e=>Game.release());
+document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+Game.draw();
+</script>
+</body>
+</html>

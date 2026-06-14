@@ -75,5 +75,26 @@
     "description": "Stack the wobbling snacks sky-high",
     "emoji": "🍔",
     "color": ["#fa709a", "#fee140"]
+  },
+  {
+    "id": "snack-plinko",
+    "title": "Snack Plinko",
+    "description": "Drop snacks through the pegs into the bins",
+    "emoji": "🍿",
+    "color": ["#00c9ff", "#92fe9d"]
+  },
+  {
+    "id": "recoil-raff",
+    "title": "Recoil Raff",
+    "description": "Blast him to the target with snack-cannon recoil",
+    "emoji": "🔫",
+    "color": ["#a18cd1", "#fbc2eb"]
+  },
+  {
+    "id": "toast-flip",
+    "title": "Toast Flip",
+    "description": "Flick the toast — land it butter-side-up",
+    "emoji": "🍞",
+    "color": ["#f7971e", "#ffd200"]
   }
 ]
