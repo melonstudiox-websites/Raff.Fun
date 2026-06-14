@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Wrecking Raff — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--accent:#e01f1f;--accent2:#ffb454;--muted:#888}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:#0a0a0a;color:#f0ede6;font-family:'DM Sans',sans-serif;height:100%;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(255,255,255,.15);border-radius:100px;color:#fff;text-decoration:none;font-size:13px;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  #c{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:1}
+  .hud{position:fixed;top:16px;left:0;right:0;display:flex;justify-content:center;gap:30px;z-index:5;pointer-events:none;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+  .hud b{color:var(--accent2);font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.04em}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(10,5,5,.85);backdrop-filter:blur(4px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:#bbb;font-size:16px;font-weight:300;max-width:340px;line-height:1.6}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--accent2);line-height:1}
+  .btn{padding:15px 46px;background:linear-gradient(135deg,var(--accent),#a00);color:#fff;font-weight:700;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s;box-shadow:0 8px 20px rgba(224,31,31,.3)}
+  .btn:active{transform:scale(.95)}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<canvas id="c"></canvas>
+<div class="hud">
+  <span>Knocked <b id="score">0</b></span>
+  <span>Swings <b id="swings">3</b></span>
+</div>
+
+<div class="overlay show" id="start">
+  <h1>Wrecking <span style="color:var(--accent)">Raff</span></h1>
+  <p>Raff's to-do list became a physical fortress of chores. Time to demolish it. <b>Drag</b> the wrecking meatball back and <b>release</b> to swing. Knock every chore off the ledge in 3 swings!</p>
+  <button class="btn" onclick="Game.start()">Wreck It</button>
+  <div class="hint">drag the ball &amp; release to swing</div>
+</div>
+<div class="overlay" id="over">
+  <div class="lbl">Chores demolished</div>
+  <div class="big" id="finalScore">0</div>
+  <h1 id="verdict">Demolished!</h1>
+  <p id="blurb"></p>
+  <button class="btn" onclick="Game.start()">Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Bodies,Body,Composite,Constraint,Vector}=Matter;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;}
+addEventListener('resize',resize);resize();
+const CHORES=['📋','🧹','🧺','📧','🛒','💼','📚','🧽'];
+
+const Game={
+  best:+(localStorage.getItem('wreck-best')||0),
+  start(){document.getElementById('start').classList.remove('show');document.getElementById('over').classList.remove('show');
+    this.build();if(!this.loopOn){this.loopOn=true;requestAnimationFrame(()=>this.frame());}},
+
+  build(){
+    const engine=Engine.create();engine.gravity.y=1.0;this.engine=engine;
+    this.particles=[];this.blocks=[];this.score=0;this.swings=3;this.over=false;this.dragging=false;this.swinging=false;this.t=0;
+    document.getElementById('score').textContent=0;document.getElementById('swings').textContent=3;
+
+    const groundY=H*0.84;this.groundY=groundY;
+    Composite.add(engine.world,Bodies.rectangle(W/2,groundY+200,W*3,400,{isStatic:true,friction:.9}));
+    // ledge platform on the right
+    this.ledgeX=W*0.66;this.ledgeTop=groundY-60;this.ledgeW=Math.min(W*0.5,230);
+    const ledge=Bodies.rectangle(this.ledgeX,this.ledgeTop+30,this.ledgeW,60,{isStatic:true,friction:.8});
+    Composite.add(engine.world,ledge);
+    // chore tower on the ledge
+    const cx=this.ledgeX;
+    let placed=0;
+    for(let l=0;l<3;l++){const cols=l===2?1:2;
+      for(let k=0;k<cols;k++){
+        const bx=cx+(cols===2?(k?22:-22):0);
+        const by=this.ledgeTop-13-l*28;
+        const b=Bodies.rectangle(bx,by,40,28,{friction:.6,density:.0012});
+        b.emoji=CHORES[placed%CHORES.length];b.counted=false;placed++;
+        this.blocks.push(b);Composite.add(engine.world,b);
+      }
+    }
+    this.total=this.blocks.length;
+    // crane pivot + wrecking ball
+    this.pivot={x:W*0.26,y:H*0.16};this.ropeLen=Math.min(H*0.42,groundY-this.pivot.y-40);
+    const ball=Bodies.circle(this.pivot.x,this.pivot.y+this.ropeLen,28,{density:.02,friction:.4,restitution:.2});
+    this.rope=Constraint.create({pointA:this.pivot,bodyB:ball,length:this.ropeLen,stiffness:.95,damping:.04});
+    Composite.add(engine.world,[ball,this.rope]);
+    this.ball=ball;Body.setStatic(ball,true);this.resting=true;
+  },
+
+  frame(){requestAnimationFrame(()=>this.frame());this.t++;
+    if(this.engine&&!this.over)this.step();if(this.engine)Engine.update(this.engine,1000/60);this.draw();},
+
+  step(){
+    // count knocked-off chores
+    for(const b of this.blocks){
+      if(!b.counted&&(b.position.y>this.ledgeTop+50||b.position.x<this.ledgeX-this.ledgeW/2-20||b.position.x>this.ledgeX+this.ledgeW/2+20)){
+        b.counted=true;this.score++;document.getElementById('score').textContent=this.score;
+        this.boom(b.position.x,b.position.y);
+        if(this.score>=this.total){this.end(true);return;}
+      }
+    }
+    // swing settle -> next swing
+    if(this.swinging&&!this.dragging){
+      if(Vector.magnitude(this.ball.velocity)<0.7)this.restT=(this.restT||0)+1;else this.restT=0;
+      if(this.restT>40){this.swinging=false;this.resting=true;this.restT=0;
+        this.swings--;document.getElementById('swings').textContent=Math.max(0,this.swings);
+        if(this.swings<=0)this.end(false);}
+    }
+    for(const p of this.particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.2;p.life--;}this.particles=this.particles.filter(p=>p.life>0);
+  },
+
+  boom(x,y){for(let i=0;i<14;i++){const a=Math.random()*6.28,s=2+Math.random()*4;this.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:26,r:3,c:'224,31,31'});}},
+
+  draw(){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#2a1418');sky.addColorStop(.5,'#321a1a');sky.addColorStop(1,'#180c0c');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    // ground
+    ctx.fillStyle='#1a1010';ctx.fillRect(0,this.groundY,W,H-this.groundY);
+    ctx.strokeStyle='rgba(224,31,31,.4)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,this.groundY);ctx.lineTo(W,this.groundY);ctx.stroke();
+    // ledge
+    ctx.fillStyle='#3a2a2a';roundRect(this.ledgeX-this.ledgeW/2,this.ledgeTop,this.ledgeW,60,6);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.06)';ctx.fillRect(this.ledgeX-this.ledgeW/2,this.ledgeTop,this.ledgeW,4);
+    // crane
+    ctx.strokeStyle='#5a5a5a';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(this.pivot.x,this.groundY);ctx.lineTo(this.pivot.x,this.pivot.y);ctx.lineTo(this.pivot.x+50,this.pivot.y);ctx.stroke();
+    ctx.fillStyle='#777';ctx.beginPath();ctx.arc(this.pivot.x,this.pivot.y,6,0,6.3);ctx.fill();
+    // rope
+    ctx.strokeStyle='#8a8a8a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(this.pivot.x,this.pivot.y);ctx.lineTo(this.ball.position.x,this.ball.position.y);ctx.stroke();
+    // chores
+    for(const b of this.blocks){ctx.save();ctx.translate(b.position.x,b.position.y);ctx.rotate(b.angle);
+      const g=ctx.createLinearGradient(0,-14,0,14);g.addColorStop(0,'#caa24a');g.addColorStop(1,'#94772f');ctx.fillStyle=g;roundRect(-20,-14,40,28,5);ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=2;ctx.stroke();
+      ctx.font='18px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(b.emoji,0,1);ctx.restore();}
+    // ball (meatball wrecking ball)
+    const bb=this.ball;ctx.save();ctx.translate(bb.position.x,bb.position.y);ctx.rotate(bb.angle);
+    const g=ctx.createRadialGradient(-8,-8,4,0,0,28);g.addColorStop(0,'#a85a2a');g.addColorStop(1,'#5e2f12');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,28,0,6.3);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.arc(-9,-9,6,0,6.3);ctx.fill();
+    ctx.font='22px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('😤',0,1);ctx.restore();
+    // particles
+    for(const p of this.particles){ctx.fillStyle='rgba('+p.c+','+(p.life/26)+')';ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.3);ctx.fill();}
+    // grab hint
+    if(this.resting&&!this.dragging&&!this.over){ctx.fillStyle='rgba(255,180,84,'+(0.4+0.3*Math.sin(this.t*0.1))+')';ctx.font='14px DM Sans';ctx.textAlign='center';ctx.fillText('drag me ↘',this.ball.position.x,this.ball.position.y-40);}
+  },
+
+  begin(sx,sy){if(this.over||this.swinging)return;if(Math.hypot(sx-this.ball.position.x,sy-this.ball.position.y)<70){this.dragging=true;Body.setStatic(this.ball,true);}},
+  move(sx,sy){if(!this.dragging)return;const dx=sx-this.pivot.x,dy=sy-this.pivot.y;const ang=Math.atan2(dy,dx);
+    const r=Math.min(Math.hypot(dx,dy),this.ropeLen);
+    Body.setPosition(this.ball,{x:this.pivot.x+Math.cos(ang)*r,y:this.pivot.y+Math.sin(ang)*r});},
+  release(){if(!this.dragging)return;this.dragging=false;Body.setStatic(this.ball,false);Body.setVelocity(this.ball,{x:0,y:0});this.swinging=true;this.resting=false;this.restT=0;},
+
+  end(win){if(this.over)return;this.over=true;if(this.score>this.best){this.best=this.score;localStorage.setItem('wreck-best',this.best);}
+    document.getElementById('finalScore').textContent=this.score;
+    let v,b;
+    if(win){v='TO-DO: DONE!';b='Every chore obliterated. Raff did zero of them but they are technically gone.';}
+    else if(this.score>=this.total-1){v='Almost!';b='One stubborn chore clings to the ledge. It will haunt him.';}
+    else if(this.score>=1){v='Some Carnage';b='A few chores fell. The list lives to nag another day.';}
+    else{v='Swing & Miss';b='The chores stand untouched. The meatball is embarrassed.';}
+    document.getElementById('verdict').textContent=v;document.getElementById('blurb').textContent=`${b} (best ${this.best})`;
+    setTimeout(()=>document.getElementById('over').classList.add('show'),700);}
+};
+addEventListener('pointerdown',e=>Game.begin(e.clientX,e.clientY));
+addEventListener('pointermove',e=>Game.move(e.clientX,e.clientY));
+addEventListener('pointerup',e=>Game.release());
+addEventListener('pointercancel',e=>Game.release());
+document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+Game.draw();
+</script>
+</body>
+</html>

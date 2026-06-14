@@ -96,5 +96,26 @@
     "description": "Flick the toast — land it butter-side-up",
     "emoji": "🍞",
     "color": ["#f7971e", "#ffd200"]
+  },
+  {
+    "id": "wrecking-raff",
+    "title": "Wrecking Raff",
+    "description": "Swing the meatball, demolish the chores",
+    "emoji": "🔨",
+    "color": ["#e01f1f", "#ffb454"]
+  },
+  {
+    "id": "snack-hoops",
+    "title": "Snack Hoops",
+    "description": "Flick snacks into the bowl from range",
+    "emoji": "🏀",
+    "color": ["#ff6a00", "#ffd275"]
+  },
+  {
+    "id": "bottle-flip",
+    "title": "Bottle Flip",
+    "description": "Flick the bottle — stick the landing",
+    "emoji": "🍾",
+    "color": ["#43e97b", "#38f9d7"]
   }
 ]

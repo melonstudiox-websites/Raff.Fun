@@ -87,8 +87,8 @@ const Game={
 
     this.launch={x:W*0.24,y:groundY-44};
     const lx=this.launch.x,ly=this.launch.y;
-    const head=Bodies.circle(lx,ly-16,15,{density:.0016,friction:.4,restitution:.3});
-    const torso=Bodies.rectangle(lx,ly+12,20,34,{density:.002,friction:.5,restitution:.2,chamfer:{radius:6}});
+    const head=Bodies.circle(lx,ly-16,15,{density:.0016,friction:.9,frictionAir:.02,restitution:.25});
+    const torso=Bodies.rectangle(lx,ly+12,20,34,{density:.002,friction:.9,frictionAir:.02,restitution:.15,chamfer:{radius:6}});
     const neck=Constraint.create({bodyA:head,bodyB:torso,pointB:{x:0,y:-17},stiffness:.9,length:5});
     Composite.add(engine.world,[head,torso,neck]);
     Body.setStatic(head,true);Body.setStatic(torso,true);
@@ -102,10 +102,11 @@ const Game={
   step(){
     if(this.launched&&!this.settled){
       const sp=Vector.magnitude(this.torso.velocity)+Vector.magnitude(this.head.velocity);
-      this.still=sp<0.5?this.still+1:0;
+      this.still=sp<0.9?this.still+1:0;
       const d=Math.max(0,Math.round((this.torso.position.x-this.launch.x)/42));
-      if(d>this.maxDist){this.maxDist=d;document.getElementById('dist').textContent=d;}
-      if(this.still>45)this.settle();
+      if(d>this.maxDist){this.maxDist=d;this.lastProg=this.t;document.getElementById('dist').textContent=d;}
+      // settle when basically stopped, OR no forward progress for a moment (stops endless slow rolling)
+      if(this.still>30 || (this.t-(this.lastProg||this.t))>75)this.settle();
       if(sp>6&&this.t%2===0)this.particles.push({x:this.torso.position.x,y:this.torso.position.y,vx:-this.torso.velocity.x*0.1,vy:-this.torso.velocity.y*0.1,life:18,r:3,c:'238,9,121'});
     }
     const fx=this.launched?this.torso.position.x:this.launch.x;
@@ -199,7 +200,7 @@ const Game={
     const vx=-Math.cos(ang)*v,vy=-Math.sin(ang)*v;
     Body.setStatic(this.head,false);Body.setStatic(this.torso,false);
     Body.setVelocity(this.torso,{x:vx,y:vy});Body.setVelocity(this.head,{x:vx,y:vy});
-    Body.setAngularVelocity(this.torso,0.35);this.launched=true;},
+    Body.setAngularVelocity(this.torso,0.35);this.launched=true;this.lastProg=this.t;this.still=0;},
 
   settle(){if(this.settled)return;this.settled=true;
     if(this.maxDist>best){best=this.maxDist;localStorage.setItem('yeet-best',best);document.getElementById('best').textContent=best;}
