@@ -1,0 +1,13 @@
+# Render deployment config for raff.fun
+# Pure static site — no build step, just serves the HTML/JSON files.
+# Docs: https://render.com/docs/static-sites
+services:
+  - type: web
+    name: raff-fun
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache

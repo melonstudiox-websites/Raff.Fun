@@ -1,4 +1,20 @@
-# raff.fun — how to add games
+# raff.fun
+
+A tiny arcade of games about Raff. Pure static site — HTML, CSS and vanilla JS, no build step.
+
+## deploying (Render)
+
+This repo ships with a `render.yaml`. On [Render](https://render.com):
+
+1. **New → Static Site**, connect this repo (Render auto-detects `render.yaml`).
+2. Publish directory is `.` (repo root); there's no build command.
+3. Deploy. `index.html` is served at the root and reads `games/manifest.json`.
+
+Works on any static host (Netlify, GitHub Pages, Cloudflare Pages) too — there's no server code.
+
+---
+
+# how to add games
 
 ## folder structure
 

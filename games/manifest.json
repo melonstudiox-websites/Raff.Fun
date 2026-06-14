@@ -4,48 +4,83 @@
     "title": "Would Raff?",
     "description": "How well do you know what Raff would do?",
     "emoji": "🤔",
-    "color": ["#ff6b35", "#f7c59f"]
+    "color": ["#ff6b35", "#8b0000"]
   },
   {
-    "id": "fin-the-raff",
+    "id": "finish-that-raff",
     "title": "Finish That Raff!",
-    "description": "Can you complete Raff's Sentences",
+    "description": "Can you complete Raff's sentences?",
     "emoji": "🗣️",
-    "color": ["#ff6b35", "#f7c59f"]
+    "color": ["#f7971e", "#ffd200"]
   },
   {
     "id": "raff-or-cap",
     "title": "Raff Or Cap?",
     "description": "Are these facts really Raff?",
     "emoji": "🧢",
-    "color": ["#ff6b35", "#f7c59f"]
+    "color": ["#1a6aff", "#0a1a4a"]
   },
   {
     "id": "raff-or-raff",
     "title": "Raff or Raff?",
     "description": "Which one is it?",
     "emoji": "👍",
-    "color": ["#ff6b35", "#f7c59f"]
+    "color": ["#43e97b", "#38f9d7"]
   },
   {
     "id": "raff-reaction",
     "title": "Raff Reaction!",
-    "description": "React How Raff Would",
+    "description": "React how Raff would",
     "emoji": "😡",
-    "color": ["#ff6b35", "#f7c59f"]
+    "color": ["#ee0979", "#ff6a00"]
   },
   {
-    "id": "raff-roullete",
-    "title": "Raff Roullete",
+    "id": "raff-roulette",
+    "title": "Raff Roulette",
     "description": "Spin the wheel for something Raff",
     "emoji": "🛞",
-    "color": ["#ff6b35", "#f7c59f"]
+    "color": ["#a18cd1", "#fbc2eb"]
   },
   {
     "id": "raff-timeline",
     "title": "Raff Timeline",
-    "description": "In what order would Raff do it",
+    "description": "In what order would Raff do it?",
     "emoji": "⏰",
-    "color": ["#ff6b35", "#f7c59f"]
+    "color": ["#12c2e9", "#c471ed"]
+  },
+  {
+    "id": "snack-stack",
+    "title": "Snack Stack",
+    "description": "Stack Raff's snacks as high as you can",
+    "emoji": "🍔",
+    "color": ["#fa709a", "#fee140"]
+  },
+  {
+    "id": "snooze-smash",
+    "title": "Snooze Smash",
+    "description": "Smash the alarms before they wake Raff",
+    "emoji": "⏰",
+    "color": ["#ff6b35", "#ffd275"]
+  },
+  {
+    "id": "raff-runner",
+    "title": "Raff Runner",
+    "description": "He's late again — jump everything",
+    "emoji": "🏃",
+    "color": ["#30cfd0", "#667eea"]
+  },
+  {
+    "id": "snack-catch",
+    "title": "Snack Catch",
+    "description": "Catch the snacks, dodge the veggies",
+    "emoji": "🍿",
+    "color": ["#00c9ff", "#92fe9d"]
+  },
+  {
+    "id": "flappy-raff",
+    "title": "Flappy Raff",
+    "description": "Tap to fly. Don't hit anything.",
+    "emoji": "🐤",
+    "color": ["#f7971e", "#ffd200"]
   }
 ]
