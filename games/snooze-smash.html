@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snooze Smash — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0a;--surface:#141414;--border:#1e1e1e;--accent:#ff6b35;--accent2:#ffd275;--text:#f0ede6;--muted:#666}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:var(--surface);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  .wrap{width:100%;max-width:520px;padding:72px 18px 40px;display:flex;flex-direction:column;align-items:center;gap:18px}
+  .title{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,8vw,52px);letter-spacing:.04em;text-align:center}
+  .title .r{color:var(--accent)}
+  .stats{display:flex;gap:26px;font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .stats b{color:var(--accent2);font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.04em}
+  .lives{color:var(--accent);letter-spacing:.1em;font-size:22px}
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;aspect-ratio:1/1.08}
+  .hole{background:radial-gradient(circle at 50% 120%,#241b14,#0e0c0a);border:1px solid var(--border);border-radius:18px;position:relative;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;cursor:pointer}
+  .mole{position:absolute;bottom:-100%;font-size:min(13vw,64px);line-height:1;transition:bottom .12s cubic-bezier(.34,1.56,.64,1);filter:drop-shadow(0 4px 8px rgba(0,0,0,.5))}
+  .hole.up .mole{bottom:14%}
+  .hole.bonk .mole{transform:scale(.6) rotate(20deg);opacity:.4;transition:all .12s}
+  .ring{position:absolute;inset:0;border-radius:18px;box-shadow:0 0 0 0 var(--accent);animation:none}
+  .hole.alarm .ring{animation:ring .35s ease-in-out infinite}
+  @keyframes ring{0%,100%{box-shadow:inset 0 0 0 2px rgba(255,107,53,.2)}50%{box-shadow:inset 0 0 0 4px rgba(255,107,53,.9)}}
+  .overlay{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:rgba(5,5,5,.85);backdrop-filter:blur(3px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(42px,11vw,76px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:var(--muted);font-size:16px;font-weight:300;max-width:330px;line-height:1.6}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:84px;color:var(--accent2);line-height:1}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .btn{padding:15px 46px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s}
+  .btn:active{transform:scale(.95)}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<div class="wrap">
+  <div class="title">Snooze <span class="r">Smash</span></div>
+  <div class="stats">
+    <span>Score <b id="score">0</b></span>
+    <span>Best <b id="best">0</b></span>
+    <span class="lives" id="lives">❤️❤️❤️</span>
+  </div>
+  <div class="board" id="board"></div>
+</div>
+
+<div class="overlay show" id="start">
+  <h1>Snooze <span style="color:var(--accent)">Smash</span></h1>
+  <p>Raff's alarms are going off everywhere and he refuses to wake up. Smash each clock before it rings! Miss 3 and he oversleeps. Again.</p>
+  <button class="btn" onclick="game.start()">Start</button>
+</div>
+<div class="overlay" id="over">
+  <div class="lbl">Alarms smashed</div>
+  <div class="big" id="finalScore">0</div>
+  <h1 id="verdict">Overslept!</h1>
+  <p id="blurb"></p>
+  <button class="btn" onclick="game.start()">Try Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script>
+const CLOCKS=['⏰','⏱️','🕰️','⌚'];
+const board=document.getElementById('board');
+const holes=[];
+for(let i=0;i<9;i++){
+  const h=document.createElement('div');
+  h.className='hole';
+  h.innerHTML='<div class="ring"></div><div class="mole">⏰</div>';
+  h.addEventListener('pointerdown',()=>game.smash(i));
+  board.appendChild(h);
+  holes.push({el:h,active:false,timer:null});
+}
+let best=+(localStorage.getItem('snooze-best')||0);
+document.getElementById('best').textContent=best;
+
+const game={
+  running:false,score:0,lives:3,spawnT:null,upTime:1300,interval:900,
+
+  start(){
+    document.getElementById('start').classList.remove('show');
+    document.getElementById('over').classList.remove('show');
+    holes.forEach((h,i)=>this.hide(i));
+    this.score=0;this.lives=3;this.upTime=1300;this.interval=950;this.running=true;
+    document.getElementById('score').textContent=0;
+    document.getElementById('lives').textContent='❤️❤️❤️';
+    this.loop();
+  },
+
+  loop(){
+    if(!this.running)return;
+    this.pop();
+    this.spawnT=setTimeout(()=>this.loop(),this.interval);
+  },
+
+  pop(){
+    const free=holes.map((h,i)=>i).filter(i=>!holes[i].active);
+    if(free.length===0)return;
+    const i=free[Math.floor(Math.random()*free.length)];
+    const h=holes[i];
+    h.active=true;
+    h.el.classList.add('up','alarm');
+    h.el.querySelector('.mole').textContent=CLOCKS[Math.floor(Math.random()*CLOCKS.length)];
+    h.timer=setTimeout(()=>{ this.miss(i); },this.upTime);
+  },
+
+  smash(i){
+    if(!this.running)return;
+    const h=holes[i];
+    if(!h.active)return;
+    clearTimeout(h.timer);
+    h.active=false;
+    h.el.classList.remove('alarm');
+    h.el.classList.add('bonk');
+    this.score++;
+    document.getElementById('score').textContent=this.score;
+    // ramp difficulty
+    this.upTime=Math.max(620,1300-this.score*14);
+    this.interval=Math.max(380,950-this.score*12);
+    setTimeout(()=>{ h.el.classList.remove('up','bonk'); },130);
+  },
+
+  miss(i){
+    const h=holes[i];
+    h.active=false;
+    h.el.classList.remove('up','alarm');
+    if(!this.running)return;
+    this.lives--;
+    document.getElementById('lives').textContent='❤️'.repeat(this.lives)+'🖤'.repeat(3-this.lives);
+    if(this.lives<=0)this.end();
+  },
+
+  hide(i){const h=holes[i];clearTimeout(h.timer);h.active=false;h.el.classList.remove('up','alarm','bonk');},
+
+  end(){
+    this.running=false;
+    clearTimeout(this.spawnT);
+    holes.forEach((h,i)=>this.hide(i));
+    if(this.score>best){best=this.score;localStorage.setItem('snooze-best',best);document.getElementById('best').textContent=best;}
+    document.getElementById('finalScore').textContent=this.score;
+    let v,b;
+    if(this.score>=40){v='Alarm Slayer!';b='Not one alarm survived. Raff is somehow STILL late, but that is on him.';}
+    else if(this.score>=25){v='Wide Awake!';b='Lightning reflexes. You could wake Raff from three rooms over.';}
+    else if(this.score>=12){v='Decent Hands';b='You snoozed most of them. Raff appreciates the effort.';}
+    else {v='Overslept!';b='Too many alarms got through. Raff is going back to sleep regardless.';}
+    document.getElementById('verdict').textContent=v;
+    document.getElementById('blurb').textContent=b;
+    setTimeout(()=>document.getElementById('over').classList.add('show'),500);
+  }
+};
+document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+</script>
+</body>
+</html>

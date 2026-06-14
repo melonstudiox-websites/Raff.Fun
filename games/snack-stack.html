@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snack Stack — Raff.fun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#fa709a;--accent2:#fee140;--text:#f0ede6;--muted:#666}
+  *,*::before,*::after{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+  .back-btn{position:fixed;top:14px;left:14px;display:flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid var(--border);border-radius:100px;color:var(--muted);text-decoration:none;font-size:13px;background:var(--surface);transition:all .15s;z-index:20}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent)}
+  .hud{position:fixed;top:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;padding-top:60px;z-index:5;pointer-events:none}
+  .title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.06em}
+  .title .r{color:var(--accent)}
+  .score{font-family:'Bebas Neue',sans-serif;font-size:60px;line-height:1;color:var(--accent2);text-shadow:0 3px 12px rgba(0,0,0,.6)}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%;z-index:1}
+  .overlay{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;background:rgba(5,5,5,.82);backdrop-filter:blur(3px);padding:24px}
+  .overlay.show{display:flex}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,11vw,80px);letter-spacing:.04em;line-height:1}
+  .overlay p{color:var(--muted);font-size:16px;font-weight:300;max-width:320px;line-height:1.6}
+  .big{font-family:'Bebas Neue',sans-serif;font-size:88px;color:var(--accent2);line-height:1}
+  .lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .btn{padding:15px 46px;background:var(--accent);color:#fff;border:none;border-radius:100px;font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.08em;cursor:pointer;transition:transform .1s}
+  .btn:active{transform:scale(.95)}
+  .hint{font-size:14px;color:var(--muted);letter-spacing:.08em}
+</style>
+</head>
+<body>
+<a href="../index.html" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+  Raff.fun
+</a>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="title">Snack <span class="r">Stack</span></div>
+  <div class="score" id="score">0</div>
+</div>
+
+<div class="overlay show" id="start">
+  <h1>Snack <span style="color:var(--accent)">Stack</span></h1>
+  <p>Raff is building the tallest snack tower known to science. Tap to drop each snack. Line it up — overhang gets sliced off!</p>
+  <button class="btn" onclick="game.start()">Start Stacking</button>
+  <div class="hint">tap / click / space to drop</div>
+</div>
+
+<div class="overlay" id="over">
+  <div class="lbl">Tower height</div>
+  <div class="big" id="finalScore">0</div>
+  <h1 id="verdict">Splat!</h1>
+  <p id="blurb"></p>
+  <button class="btn" onclick="game.start()">Try Again</button>
+  <a href="../index.html" class="back-btn" style="position:relative;top:auto;left:auto;margin-top:4px">← More games</a>
+</div>
+
+<script>
+const SNACKS=['🍔','🍟','🍩','🍕','🌮','🍪','🧁','🍫','🍿','🥪','🌭','🥯'];
+const cvs=document.getElementById('c'), ctx=cvs.getContext('2d');
+let W,H,DPR;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=window.innerWidth; H=window.innerHeight;
+  cvs.width=W*DPR; cvs.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize',resize); resize();
+
+const game={
+  running:false, blocks:[], cur:null, dir:1, speed:0, camY:0, camTarget:0,
+  score:0, baseH:46,
+
+  start(){
+    document.getElementById('start').classList.remove('show');
+    document.getElementById('over').classList.remove('show');
+    this.blocks=[]; this.score=0; this.camY=0; this.camTarget=0; this.speed=2.2;
+    const w=Math.min(W*0.42,220), x=(W-w)/2, y=H-120;
+    this.blocks.push({x,y,w,h:this.baseH,emoji:rand(SNACKS)});
+    this.spawn();
+    this.running=true;
+    document.getElementById('score').textContent=0;
+    if(!this._loop){this._loop=true; requestAnimationFrame(t=>this.tick(t));}
+  },
+
+  spawn(){
+    const prev=this.blocks[this.blocks.length-1];
+    const y=prev.y-this.baseH;
+    this.dir=Math.random()<0.5?1:-1;
+    const startX=this.dir>0?-prev.w:W;
+    this.cur={x:startX,y,w:prev.w,h:this.baseH,emoji:rand(SNACKS)};
+  },
+
+  drop(){
+    if(!this.running||!this.cur)return;
+    const prev=this.blocks[this.blocks.length-1];
+    const cur=this.cur;
+    const left=Math.max(cur.x,prev.x);
+    const right=Math.min(cur.x+cur.w,prev.x+prev.w);
+    const overlap=right-left;
+    if(overlap<=2){ // total miss
+      this.falling=cur; this.cur=null; this.gameOver(); return;
+    }
+    // slice
+    cur.x=left; cur.w=overlap;
+    this.blocks.push(cur);
+    this.cur=null;
+    this.score++;
+    document.getElementById('score').textContent=this.score;
+    this.speed=Math.min(2.2+this.score*0.18,9);
+    // scroll camera up so the action stays mid-screen
+    this.camTarget=Math.max(0,(H-120)-(cur.y));
+    if(this.score%1===0)this.camTarget=(this.blocks.length-1)*this.baseH-(H*0.45);
+    if(this.camTarget<0)this.camTarget=0;
+    setTimeout(()=>{ if(this.running)this.spawn(); },90);
+  },
+
+  gameOver(){
+    this.running=false;
+    document.getElementById('finalScore').textContent=this.score;
+    let v,b;
+    if(this.score>=25){v='Architect!';b='This tower defies snacks and physics alike. Raff is proud and a little hungry.';}
+    else if(this.score>=15){v='Towering!';b='That is a serious pile of snacks. Structural engineers are nervous.';}
+    else if(this.score>=7){v='Not Bad!';b='A respectable stack. Raff would eat the evidence either way.';}
+    else if(this.score>=3){v='Wobbly...';b='It stood for a moment. That counts for something.';}
+    else {v='Splat!';b='The snacks have hit the floor. Raff calls this "a sampling platter".';}
+    document.getElementById('verdict').textContent=v;
+    document.getElementById('blurb').textContent=b;
+    setTimeout(()=>document.getElementById('over').classList.add('show'),650);
+  },
+
+  tick(t){
+    requestAnimationFrame(t=>this.tick(t));
+    // camera easing
+    this.camY+=(this.camTarget-this.camY)*0.08;
+    // move current block
+    if(this.running&&this.cur){
+      this.cur.x+=this.dir*this.speed;
+      const prev=this.blocks[this.blocks.length-1];
+      if(this.cur.x+this.cur.w<-4){this.cur.x=-this.cur.w;this.dir=1;}
+      if(this.cur.x>W+4){this.cur.x=W;this.dir=-1;}
+    }
+    // falling sliced piece animation
+    if(this.falling){
+      this.falling.y+=10; this.falling.vr=(this.falling.vr||0)+0.04;
+    }
+    this.draw();
+  },
+
+  draw(){
+    ctx.clearRect(0,0,W,H);
+    // bg gradient
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#1a0e16'); g.addColorStop(1,'#0a0a0a');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.save();
+    ctx.translate(0,this.camY);
+    for(const b of this.blocks)this.block(b);
+    if(this.cur)this.block(this.cur,true);
+    if(this.falling){ctx.save();ctx.globalAlpha=0.7;this.block(this.falling);ctx.restore();}
+    ctx.restore();
+  },
+
+  block(b,active){
+    const r=10;
+    ctx.save();
+    const grad=ctx.createLinearGradient(b.x,b.y,b.x,b.y+b.h);
+    grad.addColorStop(0,active?'#ffd1e3':'#fa709a');
+    grad.addColorStop(1,active?'#fa709a':'#c43e6e');
+    ctx.fillStyle=grad;
+    ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=2;
+    roundRect(ctx,b.x,b.y,b.w,b.h,r); ctx.fill(); ctx.stroke();
+    // emoji centered
+    ctx.font=`${Math.min(b.h*0.7,30)}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    const n=Math.max(1,Math.floor(b.w/40));
+    for(let i=0;i<n;i++){
+      const cx=b.x+(b.w/(n+1))*(i+1);
+      ctx.fillText(b.emoji,cx,b.y+b.h/2+1);
+    }
+    ctx.restore();
+  }
+};
+
+function roundRect(c,x,y,w,h,r){r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+function rand(a){return a[Math.floor(Math.random()*a.length)];}
+
+function input(e){
+  if(e.type==='keydown'&&e.code!=='Space')return;
+  if(e.cancelable)e.preventDefault();
+  if(game.running)game.drop();
+}
+window.addEventListener('pointerdown',input);
+window.addEventListener('keydown',input);
+// prevent button taps from also dropping
+document.querySelectorAll('.btn,.back-btn').forEach(el=>el.addEventListener('pointerdown',e=>e.stopPropagation()));
+game.draw();
+</script>
+</body>
+</html>
